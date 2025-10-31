@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "375001914247",
+    "project_id": "kisanone-official",
+    "storage_bucket": "kisanone-official.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:375001914247:android:4079e0bd2f3e6389b85122",
+        "android_client_info": {
+          "package_name": "com.kisanone.KisanOne"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiLU7lF8AUY_tnWjbCXFHiUM9ZZeO1CuU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
