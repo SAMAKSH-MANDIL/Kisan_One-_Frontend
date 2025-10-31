@@ -22,7 +22,13 @@ import LanguageSelectScreen from "./src/LanguageSelectScreen";
 import CartScreen from "./src/CartScreen";
 import { CartProvider } from "./src/CartContext";
 import { OrdersProvider } from "./src/OrdersContext";
+import { StockProvider } from "./src/StockContext";
 import CropDoctorScreen from "./src/CropDoctorScreen";
+import BrandsViewAllScreen from "./src/BrandsViewAllScreen";
+import BrandDetailScreen from "./src/BrandDetailScreen";
+import ProductsViewAllScreen from "./src/ProductsViewAllScreen";
+import ProductDetailScreen from "./src/ProductDetailScreen";
+import PostDetailScreen from "./src/PostDetailScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -102,6 +108,7 @@ function MainTabNavigator() {
 export default function App() {
   return (
     <NavigationContainer>
+      <StockProvider>
       <OrdersProvider>
       <CartProvider>
       <Stack.Navigator initialRouteName="SplashScreen">
@@ -155,10 +162,36 @@ export default function App() {
           component={CropDoctorScreen}
           options={{ headerShown: false }}
         />
+        <Stack.Screen
+          name="BrandsViewAll"
+          component={BrandsViewAllScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="BrandDetail"
+          component={BrandDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ProductsViewAll"
+          component={ProductsViewAllScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ProductDetail"
+          component={ProductDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PostDetail"
+          component={PostDetailScreen}
+          options={{ headerShown: false }}
+        />
         
       </Stack.Navigator>
       </CartProvider>
       </OrdersProvider>
+      </StockProvider>
     </NavigationContainer>
   );
 }

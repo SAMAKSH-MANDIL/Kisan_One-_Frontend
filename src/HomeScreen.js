@@ -384,9 +384,12 @@ export default function HomeScreen() {
                 <Ionicons name={isListening ? "mic" : "mic-outline"} size={18} color="#FFFFFF" />
               </TouchableOpacity>
               <View style={styles.separator} />
+            {/* Image search icon temporarily disabled per request */}
+            {false && (
               <TouchableOpacity style={styles.scanButton}>
                 <MaterialIcons name="image-search" size={24} color="#666666" />
               </TouchableOpacity>
+            )}
             </View>
           </View>
         </View>
@@ -418,7 +421,7 @@ export default function HomeScreen() {
         <View style={styles.brandsSectionContainer}>
           <View style={styles.brandsSectionHeader}>
             <Text style={styles.brandsSectionTitle}>Popular Brands</Text>
-            <TouchableOpacity style={styles.viewAllBtn}>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('BrandsViewAll')}>
               <Text style={styles.viewAllBtnText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -426,7 +429,7 @@ export default function HomeScreen() {
           {/* Brands Grid - 3 rows x 3 columns */}
           <View style={styles.brandsGrid}>
             {brands.map((brand) => (
-              <TouchableOpacity key={brand.id} style={styles.brandCard}>
+              <TouchableOpacity key={brand.id} style={styles.brandCard} onPress={() => navigation.navigate('BrandDetail', { brand })}>
                 <View style={styles.brandIcon}>
                   <Text style={styles.brandEmoji}>{brand.logo}</Text>
                 </View>
@@ -440,14 +443,14 @@ export default function HomeScreen() {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recommended Products</Text>
-            <TouchableOpacity style={styles.viewAllBtn}>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'recommended', baseProducts: recommendedProducts })}>
               <Text style={styles.viewAllBtnText}>View All</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {filteredRecommended.map((product) => (
-              <View key={product.id} style={styles.productCard}>
+              <TouchableOpacity key={product.id} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
@@ -488,7 +491,7 @@ export default function HomeScreen() {
                     <Text style={styles.addToCartText}>Add to Cart</Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
@@ -497,14 +500,14 @@ export default function HomeScreen() {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Offer</Text>
-            <TouchableOpacity style={styles.viewAllBtn}>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'offers', baseProducts: filteredRecommended.slice(0, 2) })}>
               <Text style={styles.viewAllBtnText}>View All</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {filteredRecommended.slice(0, 2).map((product) => (
-              <TouchableOpacity key={`offer-${product.id}`} style={styles.productCard}>
+              <TouchableOpacity key={`offer-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
@@ -554,14 +557,14 @@ export default function HomeScreen() {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Best Selling Products</Text>
-            <TouchableOpacity style={styles.viewAllBtn}>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
               <Text style={styles.viewAllBtnText}>View All</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {filteredBestSelling.map((product) => (
-              <TouchableOpacity key={`best-${product.id}`} style={styles.productCard}>
+              <TouchableOpacity key={`best-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
@@ -614,7 +617,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.productsGrid}>
             {filteredProducts.map((product, idx) => (
-              <View key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]}>
+              <TouchableOpacity key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]} onPress={() => navigation.navigate('ProductDetail', { product })}>
                 {product.discount ? (
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>{product.discount}</Text>
@@ -659,7 +662,7 @@ export default function HomeScreen() {
                     <Text style={styles.addToCartText}>Add to Cart</Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>

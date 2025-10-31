@@ -24,6 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import Voice from '@react-native-voice/voice';
 
 export default function AIToolsScreen() {
   const navigation = useNavigation();
@@ -45,9 +46,27 @@ export default function AIToolsScreen() {
   const drawerTranslateX = React.useRef(new Animated.Value(-drawerWidth)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [profileName, setProfileName] = useState('Farmer');
+  const [isListening, setIsListening] = useState(false);
+  const [voiceLocale, setVoiceLocale] = useState('en-US');
+  const [showVoiceLangModal, setShowVoiceLangModal] = useState(false);
+  const micPulse = React.useRef(new Animated.Value(1)).current;
+  const micLoopRef = React.useRef(null);
+
+  const supportedVoiceLocales = [
+    { code: 'en-US', label: 'English' },
+    { code: 'hi-IN', label: 'Hindi' },
+    { code: 'bn-IN', label: 'Bengali' },
+    { code: 'gu-IN', label: 'Gujarati' },
+    { code: 'kn-IN', label: 'Kannada' },
+    { code: 'mr-IN', label: 'Marathi' },
+    { code: 'pa-IN', label: 'Punjabi' },
+    { code: 'ta-IN', label: 'Tamil' },
+    { code: 'te-IN', label: 'Telugu' },
+  ];
 
   const requestAndSetLocation = async () => {
     try {
+      // Single-implementation using React Native Geolocation + Android runtime permission
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
@@ -59,43 +78,46 @@ export default function AIToolsScreen() {
         }
       }
 
-      // Use navigator.geolocation (built-in browser/RN API)
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            
-            // Try to reverse geocode to get location name
-            try {
-              const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-              );
-              const data = await response.json();
-              const address = data.address || {};
-              const city = address.city || address.town || address.village || '';
-              const state = address.state || '';
-              const locationText = [city, state].filter(Boolean).join(', ') || `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
-              setLocationName(locationText);
-            } catch (error) {
-              // Fallback to coordinates
-              setLocationName(`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`);
-            }
-            
-            setLocationEnabled(true);
-            setShowLocationModal(false);
-            setShowAccuracyModal(false);
-          },
-          (error) => {
-            console.log('Location error:', error);
+      if (!navigator.geolocation) {
+        setLocationEnabled(false);
+        setLocationName('Geolocation not available');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords || {};
+          if (latitude == null || longitude == null) {
             setLocationName('Unable to fetch location');
             setLocationEnabled(false);
-          },
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-        );
-      } else {
-        setLocationName('Unable to fetch location');
-        setLocationEnabled(false);
-      }
+            return;
+          }
+          let locationText = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+            const data = await response.json();
+            const address = data.address || {};
+            const city = address.city || address.town || address.village || '';
+            const state = address.state || '';
+            const maybe = [city, state].filter(Boolean).join(', ');
+            if (maybe) locationText = maybe;
+          } catch (rgErr) {
+            // keep lat/long fallback
+          }
+          setLocationName(locationText);
+          setLocationEnabled(true);
+          setShowLocationModal(false);
+          setShowAccuracyModal(false);
+        },
+        (error) => {
+          console.log('Location error:', error);
+          setLocationName('Unable to fetch location');
+          setLocationEnabled(false);
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
+      );
     } catch (e) {
       console.log('Location exception:', e);
       setLocationName('Unable to fetch location');
@@ -133,12 +155,12 @@ export default function AIToolsScreen() {
 
   const handleEnableLocation = () => {
     setShowLocationModal(false);
-    setShowAccuracyModal(true);
+    // Start permission flow directly; accuracy modal not required with expo-location
+    requestAndSetLocation();
   };
 
   const handleSkipLocation = () => {
     setShowLocationModal(false);
-    openManualLocationSelector();
   };
 
   const handleTurnOnAccuracy = async () => {
@@ -148,7 +170,6 @@ export default function AIToolsScreen() {
 
   const handleNoThanks = () => {
     setShowAccuracyModal(false);
-    openManualLocationSelector();
   };
 
   const openManualLocationSelector = () => {
@@ -247,18 +268,9 @@ export default function AIToolsScreen() {
 
   const isFocused = useIsFocused();
 
-  // Check location permission when screen is focused
+  // Avoid auto-prompt loops; user initiates location from the icon
   useEffect(() => {
-    if (isFocused) {
-      checkLocationPermission();
-    }
-
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && isFocused) {
-        checkLocationPermission();
-      }
-    });
-    return () => sub.remove();
+    // no-op
   }, [isFocused]);
 
   // Listen to keyboard to adjust layout
@@ -310,6 +322,59 @@ export default function AIToolsScreen() {
     ]).start();
   };
 
+  // Voice recognition handlers for search bar
+  useEffect(() => {
+    Voice.onSpeechStart = () => setIsListening(true);
+    Voice.onSpeechEnd = () => setIsListening(false);
+    Voice.onSpeechError = () => setIsListening(false);
+    Voice.onSpeechResults = (e) => {
+      const text = (e && e.value && e.value[0]) ? e.value[0] : '';
+      if (text) setSearchQuery(text);
+    };
+    return () => {
+      try { Voice.destroy().then(Voice.removeAllListeners); } catch (_) {}
+    };
+  }, []);
+
+  const startVoiceRecognition = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission required', 'Microphone permission is needed to use voice input.');
+          return;
+        }
+      }
+      await Voice.start(voiceLocale);
+    } catch (_) {}
+  };
+
+  const stopVoiceRecognition = async () => {
+    try { await Voice.stop(); } catch (_) {}
+  };
+
+  const handleMicPress = () => {
+    if (isListening) stopVoiceRecognition(); else startVoiceRecognition();
+  };
+
+  // Simple pulse animation while listening
+  useEffect(() => {
+    if (isListening) {
+      micLoopRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(micPulse, { toValue: 1.15, duration: 450, useNativeDriver: true }),
+          Animated.timing(micPulse, { toValue: 1.0, duration: 450, useNativeDriver: true }),
+        ])
+      );
+      micLoopRef.current.start();
+    } else {
+      try { micLoopRef.current?.stop(); } catch (_) {}
+      micPulse.setValue(1);
+    }
+  }, [isListening]);
+
   const closeDrawer = () => {
     Animated.parallel([
       Animated.timing(drawerTranslateX, { toValue: -drawerWidth, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
@@ -345,7 +410,7 @@ export default function AIToolsScreen() {
         
         <TouchableOpacity 
           style={styles.locationIconContainer}
-          onPress={openPermissionFlow}
+          onPress={requestAndSetLocation}
         >
           <Ionicons name="location-outline" size={24} color="#666666" />
         </TouchableOpacity>
@@ -435,9 +500,16 @@ export default function AIToolsScreen() {
               <Ionicons name="arrow-up" size={20} color="#47afcfff" />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.iconButton} onPress={() => Alert.alert('Voice', 'Start voice input...')}>
-              <Ionicons name="mic-outline" size={24} color="#47afcfff" />
+            <>
+            <TouchableOpacity style={[styles.langButton]} onPress={() => setShowVoiceLangModal(true)}>
+              <Text style={styles.langButtonText}>{(voiceLocale.split('-')[0] || 'EN').toUpperCase()}</Text>
             </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: micPulse }] }}>
+              <TouchableOpacity style={[styles.iconButton, isListening && { backgroundColor: '#F1F5F9', borderRadius: 18 }]} onPress={handleMicPress}>
+                <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={24} color="#47afcfff" />
+              </TouchableOpacity>
+            </Animated.View>
+            </>
           )}
         </View>
       </View>
@@ -481,6 +553,31 @@ export default function AIToolsScreen() {
                 <Text style={styles.cancelButtonText}>Don't allow</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Voice Language Picker */}
+      <Modal
+        visible={showVoiceLangModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowVoiceLangModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select voice language</Text>
+            <View style={{ width: '100%' }}>
+              {supportedVoiceLocales.map((item) => (
+                <TouchableOpacity key={item.code} style={[styles.drawerItem, { borderBottomWidth: 0 }]} onPress={() => { setVoiceLocale(item.code); setShowVoiceLangModal(false); }}>
+                  <Text style={[styles.drawerItemText, { flex: 1 }]}>{item.label}</Text>
+                  {voiceLocale === item.code && <Ionicons name="checkmark" size={18} color="#2E7D32" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={[styles.skipButton, { marginTop: 8 }]} onPress={() => setShowVoiceLangModal(false)}>
+              <Text style={styles.skipButtonText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -883,6 +980,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  langButton: {
+    marginRight: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  langButtonText: {
+    color: '#47afcfff',
+    fontWeight: '700',
+    fontSize: 12,
   },
   modalOverlay: {
     flex: 1,

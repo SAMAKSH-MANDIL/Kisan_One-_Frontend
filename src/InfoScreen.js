@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 
-export default function InfoScreen() {
+export default function InfoScreen({ navigation }) {
 
   const [countries, setcountries] = useState(Country.getAllCountries);
   const [states, setStates] = useState([]);
@@ -32,7 +32,7 @@ export default function InfoScreen() {
   const [showStateInput, setShowStateInput] = useState(false);
   const [showCityInput, setShowCityInput] = useState(false);
 
-  const sections = ['Mandi Price', 'Schemes', 'Latest Update'];
+  const sections = ['Mandi Price', 'Schemes', 'Post'];
   // Complete India States and Cities Data
   const indiaStatesAndCities = {
     "Andhra Pradesh": [
@@ -273,13 +273,68 @@ export default function InfoScreen() {
     ],
   };
 
-  // Sample Updates
-  const latestUpdates = [
-    { date: '2024-01-15', title: 'New Mandi Prices Updated', desc: 'Fresh price list for all commodities released' },
-    { date: '2024-01-12', title: 'New Scheme Launched', desc: 'State government launches new farmer support scheme' },
-    { date: '2024-01-10', title: 'Weather Alert', desc: 'Heavy rainfall expected in next 3 days' },
-    { date: '2024-01-08', title: 'Seed Distribution', desc: 'Free quality seeds available at agriculture office' },
+  // Sample Posts with full content
+  const allPosts = [
+    { 
+      id: 1,
+      date: '2024-01-15', 
+      title: 'New Mandi Prices Updated', 
+      desc: 'Fresh price list for all commodities released',
+      content: 'The Agricultural Marketing Board has updated the latest mandi prices for all major commodities. Farmers can now check real-time prices for rice, wheat, vegetables, and other agricultural products. The new pricing reflects current market conditions and helps farmers make informed decisions about when and where to sell their produce. Prices are updated daily based on market demand and supply conditions across different mandis in the region.'
+    },
+    { 
+      id: 2,
+      date: '2024-01-12', 
+      title: 'New Scheme Launched', 
+      desc: 'State government launches new farmer support scheme',
+      content: 'The state government has announced a new comprehensive farmer support scheme aimed at improving agricultural productivity and farmer income. The scheme includes subsidies for modern farming equipment, low-interest loans for agricultural activities, and training programs for sustainable farming practices. Eligible farmers can apply through the official portal or visit their nearest agriculture office. The scheme is expected to benefit over 50,000 farmers in the state.'
+    },
+    { 
+      id: 3,
+      date: '2024-01-10', 
+      title: 'Weather Alert', 
+      desc: 'Heavy rainfall expected in next 3 days',
+      content: 'The Meteorological Department has issued a weather alert for heavy rainfall in the region over the next three days. Farmers are advised to take necessary precautions to protect their crops and harvest produce that is ready. Heavy rains may cause waterlogging in low-lying areas, so proper drainage systems should be checked. Farmers should also secure their farm equipment and storage facilities to prevent damage from the expected heavy downpour.'
+    },
+    { 
+      id: 4,
+      date: '2024-01-08', 
+      title: 'Seed Distribution', 
+      desc: 'Free quality seeds available at agriculture office',
+      content: 'The Department of Agriculture is distributing free high-quality seeds to registered farmers at all district agriculture offices. The seeds include varieties of wheat, rice, pulses, and vegetables that are suitable for the current season. Farmers need to bring their farmer registration card and valid ID proof to collect the seeds. Distribution will continue until stocks last. This initiative aims to support farmers with quality inputs for better crop yields.'
+    },
+    { 
+      id: 5,
+      date: '2024-01-05', 
+      title: 'Organic Farming Workshop', 
+      desc: 'Free training session on organic farming techniques',
+      content: 'A comprehensive workshop on organic farming techniques will be conducted next week at the Regional Agriculture Extension Office. The workshop will cover topics including organic manure preparation, pest management using natural methods, soil health improvement, and organic certification processes. Experienced organic farmers and agriculture experts will conduct the sessions. Free registration is open for all interested farmers.'
+    },
+    { 
+      id: 6,
+      date: '2024-01-03', 
+      title: 'Crop Insurance Enrollment', 
+      desc: 'Last date extended for crop insurance enrollment',
+      content: 'The enrollment deadline for the Pradhan Mantri Fasal Bima Yojana (PMFBY) has been extended by one week. Farmers who have not yet enrolled for crop insurance can now do so at their nearest Common Service Centre (CSC) or through the online portal. The insurance provides financial protection against crop loss due to natural calamities, pests, and diseases. Premium rates are subsidized, making it affordable for all farmers.'
+    },
+    { 
+      id: 7,
+      date: '2024-01-01', 
+      title: 'New Agricultural Technology', 
+      desc: 'Introduction of drone technology for crop monitoring',
+      content: 'The government is introducing drone technology for crop monitoring and precision agriculture. This initiative will help farmers monitor their crops more effectively, identify problem areas early, and optimize resource usage. Training programs for farmers on using drone technology will be conducted in collaboration with agricultural universities. Subsidies are available for farmers interested in purchasing agricultural drones.'
+    },
+    { 
+      id: 8,
+      date: '2023-12-28', 
+      title: 'Water Management Program', 
+      desc: 'New irrigation techniques to save water',
+      content: 'A new water management program focusing on efficient irrigation techniques has been launched. The program promotes drip irrigation, sprinkler systems, and other water-saving methods. Farmers attending the training will receive subsidies for installing water-efficient irrigation systems. This initiative aims to reduce water consumption by 30% while maintaining or improving crop yields.'
+    },
   ];
+
+  const [currentPostPage, setCurrentPostPage] = useState(0);
+  const postsPerPage = 4;
   // Get available cities for selected state
   const getAvailableCities = () => {
     if (selectedState && indiaStatesAndCities[selectedState]) {
@@ -551,44 +606,86 @@ export default function InfoScreen() {
     </ScrollView>
   );
 
-  const renderLatestUpdate = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.updatesHeader}>
-        <MaterialIcons name="new-releases" size={24} color="#2E7D32" />
-        <Text style={styles.updatesHeaderText}>Stay Updated</Text>
-      </View>
+  const renderPost = () => {
+    const startIndex = currentPostPage * postsPerPage;
+    const endIndex = startIndex + postsPerPage;
+    const currentPosts = allPosts.slice(startIndex, endIndex);
+    const totalPages = Math.ceil(allPosts.length / postsPerPage);
+    const canGoPrevious = currentPostPage > 0;
+    const canGoNext = currentPostPage < totalPages - 1;
 
-      {latestUpdates.map((update, index) => (
-        <TouchableOpacity key={index} style={styles.updateCard}>
-          <View style={styles.updateHeader}>
-            <View style={styles.updateIcon}>
-              <MaterialIcons name="campaign" size={18} color="#2E7D32" />
-            </View>
-            <View style={styles.updateContent}>
-              <View style={styles.updateDateRow}>
-                <Ionicons name="calendar-outline" size={14} color="#666666" />
-                <Text style={styles.updateDate}>{update.date}</Text>
-              </View>
-              <Text style={styles.updateTitle}>{update.title}</Text>
-              <Text style={styles.updateDesc}>{update.desc}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#999999" />
+    return (
+      <View style={styles.postContainer}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.postScrollContent}
+        >
+          <View style={styles.updatesHeader}>
+            <MaterialIcons name="new-releases" size={24} color="#2E7D32" />
+            <Text style={styles.updatesHeaderText}>Stay Updated</Text>
           </View>
-        </TouchableOpacity>
-      ))}
 
-      <TouchableOpacity style={styles.viewMoreButton}>
-        <Text style={styles.viewMoreText}>View All Updates</Text>
-        <Ionicons name="arrow-forward" size={18} color="#2E7D32" />
-      </TouchableOpacity>
-    </ScrollView>
-  );
+          {currentPosts.map((post) => (
+            <TouchableOpacity 
+              key={post.id} 
+              style={styles.updateCard}
+              onPress={() => navigation?.navigate('PostDetail', { post })}
+            >
+              <View style={styles.updateHeader}>
+                <View style={styles.updateIcon}>
+                  <MaterialIcons name="campaign" size={18} color="#2E7D32" />
+                </View>
+                <View style={styles.updateContent}>
+                  <View style={styles.updateDateRow}>
+                    <Ionicons name="calendar-outline" size={14} color="#666666" />
+                    <Text style={styles.updateDate}>{post.date}</Text>
+                  </View>
+                  <Text style={styles.updateTitle}>{post.title}</Text>
+                  <Text style={styles.updateDesc}>{post.desc}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#999999" />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Sticky Pagination Controls */}
+        <View style={styles.paginationContainer}>
+          <TouchableOpacity
+            style={[styles.paginationButton, !canGoPrevious && styles.paginationButtonDisabled]}
+            onPress={() => canGoPrevious && setCurrentPostPage(currentPostPage - 1)}
+            disabled={!canGoPrevious}
+          >
+            <Ionicons name="chevron-back" size={20} color={canGoPrevious ? "#2E7D32" : "#999999"} />
+            <Text style={[styles.paginationButtonText, !canGoPrevious && styles.paginationButtonTextDisabled]}>
+              Previous
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.paginationInfo}>
+            Page {currentPostPage + 1} of {totalPages}
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.paginationButton, !canGoNext && styles.paginationButtonDisabled]}
+            onPress={() => canGoNext && setCurrentPostPage(currentPostPage + 1)}
+            disabled={!canGoNext}
+          >
+            <Text style={[styles.paginationButtonText, !canGoNext && styles.paginationButtonTextDisabled]}>
+              Next
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={canGoNext ? "#2E7D32" : "#999999"} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   const renderContent = () => {
     switch (activeSection) {
       case 'Mandi Price': return renderMandiPrice();
       case 'Schemes': return renderSchemes();
-      case 'Latest Update': return renderLatestUpdate();
+      case 'Post': return renderPost();
       default: return renderMandiPrice();
     }
   };
@@ -1059,5 +1156,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#2E7D32',
+  },
+  postContainer: {
+    flex: 1,
+  },
+  postScrollContent: {
+    paddingBottom: 100,
+  },
+  paginationContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  paginationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2E7D32',
+    gap: 6,
+  },
+  paginationButtonDisabled: {
+    borderColor: '#E5E7EB',
+  },
+  paginationButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E7D32',
+  },
+  paginationButtonTextDisabled: {
+    color: '#999999',
+  },
+  paginationInfo: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666666',
   },
 });

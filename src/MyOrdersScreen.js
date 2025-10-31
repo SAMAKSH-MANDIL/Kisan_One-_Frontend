@@ -66,7 +66,9 @@ export default function MyOrdersScreen() {
   };
 
   const mergedOrders = useMemo(() => {
-    return [...placedOrders, ...sampleOrders];
+    // Ensure placedOrders is an array
+    const orders = Array.isArray(placedOrders) ? placedOrders : [];
+    return [...orders, ...sampleOrders];
   }, [placedOrders]);
 
   const filteredOrders = activeTab === 'All' 
@@ -143,14 +145,14 @@ export default function MyOrdersScreen() {
               </View>
 
               <View style={styles.productsContainer}>
-                {order.products.map((product, index) => (
+                {order.products && Array.isArray(order.products) ? order.products.map((product, index) => (
                   <View key={index} style={styles.productItem}>
                     <Text style={styles.productName}>{product.name}</Text>
                     <Text style={styles.productDetails}>
                       Qty: {product.quantity} • {product.price}
                     </Text>
                   </View>
-                ))}
+                )) : null}
               </View>
 
               <View style={styles.orderActions}>
