@@ -1,0 +1,61 @@
+{
+  "projectName": "kisanone-frontend-main",
+  "type": "react-native-app",
+  "frameworks": ["React Native", "Expo"],
+  "navigation": {
+    "library": "@react-navigation",
+    "structure": {
+      "root": "StackNavigator",
+      "tabs": ["Home", "AI Tools", "GrowBio", "My Orders", "Info"]
+    }
+  },
+  "state": {
+    "contexts": ["CartContext", "OrdersContext", "StockContext", "LanguageContext"],
+    "storage": ["Firebase Firestore"]
+  },
+  "platformModules": [
+    "expo-location",
+    "@react-native-voice/voice",
+    "react-native-safe-area-context"
+  ],
+  "services": {
+    "auth": "@react-native-firebase/auth",
+    "firestore": "@react-native-firebase/firestore",
+    "gemini": "src/services/gemini.js"
+  },
+  "screens": [
+    "SplashScreen",
+    "LanguageSelection",
+    "Login",
+    "Dashboard (Tabs)",
+    "HomeScreen",
+    "AIToolsScreen",
+    "GrowBioScreen",
+    "MyOrdersScreen",
+    "InfoScreen",
+    "MyProfileScreen",
+    "HelpScreen",
+    "LanguageSelectScreen",
+    "CartScreen",
+    "CropDoctorScreen",
+    "CropRecommendationScreen",
+    "CropAdvisoryScreen",
+    "BrandsViewAllScreen",
+    "BrandDetailScreen",
+    "ProductsViewAllScreen",
+    "ProductDetailScreen",
+    "PostDetailScreen",
+    "SchemeDetailScreen"
+  ],
+  "notableUX": {
+    "homeSearchDropdown": true,
+    "aiToolsFixedBar": true,
+    "aiChatInlineSheet": true
+  },
+  "buildAssumptions": {
+    "requiresDevBuildForVoice": true,
+    "expoGoLimitations": ["@react-native-voice/voice"]
+  }
+}
+
+

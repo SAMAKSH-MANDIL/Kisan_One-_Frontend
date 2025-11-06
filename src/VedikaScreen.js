@@ -9,9 +9,12 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ms } from './utils/responsive';
 
 export default function VedikaScreen() {
   const [activeTab, setActiveTab] = useState('Community');
+  const insets = useSafeAreaInsets();
 
   const tabs = ['Community', 'Questions', 'Tips', 'Events'];
 
@@ -291,7 +294,7 @@ export default function VedikaScreen() {
       </View>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={styles.fab}>
+      <TouchableOpacity style={[styles.fab, { bottom: 80 + (insets?.bottom || 0) }]}>
         <Text style={styles.fabIcon}>✏️</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -310,13 +313,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: ms(24),
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: ms(13),
     color: '#E8F5E8',
   },
   searchContainer: {
@@ -635,7 +638,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   fabIcon: {
-    fontSize: 24,
+    fontSize: ms(22),
     color: '#FFFFFF',
   },
 });

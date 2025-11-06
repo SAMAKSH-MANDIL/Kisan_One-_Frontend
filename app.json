@@ -2,7 +2,25 @@
   "expo": {
     "name": "KisanOne",
     "slug": "KisanOne",
-    "plugins": ["@react-native-firebase/app", "@react-native-firebase/auth"],
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you select crop images for disease detection.",
+          "cameraPermission": "The app accesses your camera to let you take photos of crops for disease detection."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow KisanOne to use your location to provide location-based services.",
+          "locationAlwaysPermission": "Allow KisanOne to use your location in the background.",
+          "locationWhenInUsePermission": "Allow KisanOne to use your location to provide location-based services."
+        }
+      ]
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -28,9 +28,11 @@ export default function InfoScreen({ navigation }) {
   const [activeSection, setActiveSection] = useState('Mandi Price');
   const [selectedState, setSelectedState] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
-  const [schemeCategory, setSchemeCategory] = useState('Central');
+  const [schemeCategory, setSchemeCategory] = useState('Government');
+  const [selectedSchemeState, setSelectedSchemeState] = useState(''); // For schemes state dropdown
   const [showStateInput, setShowStateInput] = useState(false);
   const [showCityInput, setShowCityInput] = useState(false);
+  const [showSchemeStateInput, setShowSchemeStateInput] = useState(false);
 
   const sections = ['Mandi Price', 'Schemes', 'Post'];
   // Complete India States and Cities Data
@@ -249,29 +251,210 @@ export default function InfoScreen({ navigation }) {
     { item: 'Corn', variety: 'Yellow', minPrice: 1500, maxPrice: 1800, unit: 'Quintal' },
   ];
 
-  // Sample Schemes data
-  const schemes = {
-    Central: [
-      { name: 'PM Kisan', desc: 'Direct Income Support to Farmers', status: 'Active' },
-      { name: 'Pradhan Mantri Fasal Bima Yojana', desc: 'Crop Insurance Scheme', status: 'Active' },
-      { name: 'Kisan Credit Card', desc: 'Credit Facility for Farmers', status: 'Active' },
+  // Indian States List
+  const indianStates = [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal'
+  ];
+
+  // Sample Schemes data - State-specific schemes
+  const stateSchemes = {
+    'Andhra Pradesh': [
+      { 
+        name: 'Rythu Bharosa Scheme', 
+        desc: 'Financial assistance to farmers for agricultural inputs', 
+        state: 'Andhra Pradesh',
+        content: 'The Rythu Bharosa Scheme provides financial assistance of ₹13,500 per annum to all eligible farmers in Andhra Pradesh. The scheme includes ₹7,500 for crop investment and ₹6,000 for insurance and other agricultural expenses. This scheme aims to support farmers throughout the agricultural cycle and improve their economic condition.',
+        website: 'https://rythubharosa.ap.gov.in'
+      },
+      { 
+        name: 'AP State Agriculture Mechanization Scheme', 
+        desc: 'Subsidy on agricultural machinery and equipment', 
+        state: 'Andhra Pradesh',
+        content: 'This scheme provides up to 50% subsidy on agricultural machinery including tractors, harvesters, and other farm equipment. Small and marginal farmers can avail higher subsidy rates. The scheme promotes modern farming techniques and reduces manual labor.',
+        website: 'https://agri.ap.gov.in'
+      },
     ],
-    Government: [
-      { name: 'National Food Security Mission', desc: 'Food security for farmers', status: 'Active' },
-      { name: 'Rashtriya Krishi Vikas Yojana', desc: 'Agricultural Development', status: 'Active' },
-      { name: 'Sub-Mission on Agricultural Mechanization', desc: 'Machinery Subsidy', status: 'Active' },
+    'Gujarat': [
+      { 
+        name: 'Mukhyamantri Kisan Sahay Yojana', 
+        desc: 'Crop loss compensation scheme for farmers', 
+        state: 'Gujarat',
+        content: 'The Mukhyamantri Kisan Sahay Yojana provides financial assistance to farmers in case of crop loss due to natural calamities. The scheme covers crop damage, natural disasters, and pest attacks. Farmers receive compensation directly in their bank accounts.',
+        website: 'https://ikhedut.gujarat.gov.in'
+      },
+      { 
+        name: 'Gujarat Krishi Mahotsav', 
+        desc: 'Annual agricultural festival with schemes and subsidies', 
+        state: 'Gujarat',
+        content: 'Gujarat Krishi Mahotsav is an annual event that showcases various agricultural schemes, subsidies, and technologies. Farmers can access information about seeds, fertilizers, machinery, and government support programs during this event.',
+        website: 'https://ikhedut.gujarat.gov.in'
+      },
     ],
-    State: [
-      { name: 'State Agriculture Scheme', desc: 'Local farmer support', status: 'Active' },
-      { name: 'State Irrigation Scheme', desc: 'Water management support', status: 'Active' },
-      { name: 'State Crop Insurance', desc: 'State level insurance', status: 'Active' },
+    'Karnataka': [
+      { 
+        name: 'Raitha Belaku Scheme', 
+        desc: 'Solar-powered pump sets for irrigation', 
+        state: 'Karnataka',
+        content: 'The Raitha Belaku Scheme provides solar-powered irrigation pump sets to farmers at subsidized rates. The scheme aims to reduce electricity dependency and promote renewable energy in agriculture. Farmers receive up to 75% subsidy on solar pump sets.',
+        website: 'https://raitamitra.karnataka.gov.in'
+      },
+      { 
+        name: 'Karnataka Farmers Insurance Scheme', 
+        desc: 'Comprehensive crop insurance for Karnataka farmers', 
+        state: 'Karnataka',
+        content: 'This state-level crop insurance scheme provides coverage against crop loss due to natural calamities, pests, and diseases. Premium rates are subsidized, and claim settlements are processed quickly. The scheme covers all major crops grown in Karnataka.',
+        website: 'https://raitamitra.karnataka.gov.in'
+      },
     ],
-    Private: [
-      { name: 'AgriTech Innovation Fund', desc: 'Private sector support', status: 'Active' },
-      { name: 'Corporate Social Responsibility', desc: 'CSR initiatives', status: 'Active' },
-      { name: 'Private Sector Loans', desc: 'Low interest loans', status: 'Active' },
+    'Maharashtra': [
+      { 
+        name: 'Mahatma Phule Krishi Karj Mukti Yojana', 
+        desc: 'Debt waiver scheme for farmers', 
+        state: 'Maharashtra',
+        content: 'This scheme provides debt relief to eligible farmers who have taken loans from banks and cooperatives. Small and marginal farmers receive complete loan waiver up to a certain limit. The scheme aims to alleviate the financial burden on farmers.',
+        website: 'https://mahagriculture.gov.in'
+      },
+      { 
+        name: 'Maharashtra Agriculture Modernization Scheme', 
+        desc: 'Support for modern farming techniques', 
+        state: 'Maharashtra',
+        content: 'The scheme promotes modern farming techniques including precision agriculture, drip irrigation, and organic farming. Farmers receive financial assistance for adopting new technologies and practices that improve productivity and sustainability.',
+        website: 'https://mahagriculture.gov.in'
+      },
+    ],
+    'Punjab': [
+      { 
+        name: 'Punjab Kisan Vikas Yojana', 
+        desc: 'Comprehensive development scheme for Punjab farmers', 
+        state: 'Punjab',
+        content: 'The Punjab Kisan Vikas Yojana focuses on improving agricultural infrastructure, providing quality seeds and fertilizers, and supporting diversification of crops. The scheme includes components for irrigation, mechanization, and marketing support.',
+        website: 'https://punjab.gov.in'
+      },
+      { 
+        name: 'Punjab State Agriculture Marketing Board Schemes', 
+        desc: 'Marketing support and infrastructure for farmers', 
+        state: 'Punjab',
+        content: 'This scheme provides marketing infrastructure and support to farmers for better price realization. It includes development of market yards, cold storage facilities, and direct marketing initiatives to connect farmers with buyers.',
+        website: 'https://punjab.gov.in'
+      },
+    ],
+    'Rajasthan': [
+      { 
+        name: 'Rajasthan Bhamashah Scheme', 
+        desc: 'Direct benefit transfer for agricultural subsidies', 
+        state: 'Rajasthan',
+        content: 'The Bhamashah Scheme ensures direct benefit transfer of agricultural subsidies to farmers\' bank accounts. It eliminates intermediaries and ensures transparency. The scheme covers subsidies for seeds, fertilizers, electricity, and irrigation.',
+        website: 'https://bhamashah.rajasthan.gov.in'
+      },
+      { 
+        name: 'Rajasthan Krishi Upaj Mandi Samiti Scheme', 
+        desc: 'Market infrastructure and farmer support', 
+        state: 'Rajasthan',
+        content: 'This scheme focuses on improving agricultural market infrastructure including mandis, storage facilities, and processing units. It also provides support for farmer producer organizations and direct marketing initiatives.',
+        website: 'https://rajmandi.rajasthan.gov.in'
+      },
+    ],
+    'Tamil Nadu': [
+      { 
+        name: 'Tamil Nadu Agriculture Infrastructure Scheme', 
+        desc: 'Development of agricultural infrastructure', 
+        state: 'Tamil Nadu',
+        content: 'This comprehensive scheme focuses on developing agricultural infrastructure including irrigation systems, storage facilities, and processing units. It also supports farmer training and capacity building programs.',
+        website: 'https://agritech.tnau.ac.in'
+      },
+      { 
+        name: 'Tamil Nadu Organic Farming Scheme', 
+        desc: 'Promotion of organic farming practices', 
+        state: 'Tamil Nadu',
+        content: 'The scheme promotes organic farming by providing subsidies on organic inputs, certification support, and market linkages. Farmers receive financial assistance for transitioning to organic farming and maintaining organic certification.',
+        website: 'https://agritech.tnau.ac.in'
+      },
+    ],
+    'Uttar Pradesh': [
+      { 
+        name: 'UP Kisan Samman Nidhi Yojana', 
+        desc: 'Financial assistance to small and marginal farmers', 
+        state: 'Uttar Pradesh',
+        content: 'The scheme provides direct financial assistance of ₹4,000 per annum to small and marginal farmers in Uttar Pradesh. The amount is transferred directly to farmers\' bank accounts in three installments to support agricultural activities.',
+        website: 'https://up.gov.in'
+      },
+      { 
+        name: 'UP Agriculture Mechanization Scheme', 
+        desc: 'Subsidy on farm machinery and equipment', 
+        state: 'Uttar Pradesh',
+        content: 'This scheme provides subsidies on agricultural machinery including tractors, combine harvesters, threshers, and other equipment. The subsidy percentage varies based on the category of farmers, with higher rates for small and marginal farmers.',
+        website: 'https://up.gov.in'
+      },
+    ],
+    'West Bengal': [
+      { 
+        name: 'Bangla Krishi Sech Yojana', 
+        desc: 'Irrigation infrastructure development', 
+        state: 'West Bengal',
+        content: 'The Bangla Krishi Sech Yojana focuses on developing irrigation infrastructure across West Bengal. It includes construction of canals, tube wells, and other irrigation facilities to ensure water availability for agriculture throughout the year.',
+        website: 'https://wb.gov.in'
+      },
+      { 
+        name: 'West Bengal Agriculture Development Scheme', 
+        desc: 'Comprehensive agricultural development program', 
+        state: 'West Bengal',
+        content: 'This scheme provides comprehensive support for agricultural development including seed distribution, fertilizer subsidies, farmer training, and market infrastructure. It aims to improve agricultural productivity and farmer income in West Bengal.',
+        website: 'https://wb.gov.in'
+      },
     ],
   };
+
+  // Government schemes (non-state specific)
+  const governmentSchemes = [
+    { 
+      name: 'National Food Security Mission', 
+      desc: 'Food security for farmers through increased production', 
+      state: 'Central',
+      content: 'The National Food Security Mission aims to increase production of rice, wheat, pulses, and coarse cereals through area expansion and productivity enhancement. The mission provides support for seeds, fertilizers, and agricultural practices that improve crop yields.',
+      website: 'https://nfsm.gov.in'
+    },
+    { 
+      name: 'Rashtriya Krishi Vikas Yojana', 
+      desc: 'Agricultural Development Program', 
+      state: 'Central',
+      content: 'Rashtriya Krishi Vikas Yojana is a centrally sponsored scheme that focuses on comprehensive development of agriculture and allied sectors. It provides financial assistance for infrastructure development, capacity building, and adoption of new technologies.',
+      website: 'https://rkvy.nic.in'
+    },
+    { 
+      name: 'Sub-Mission on Agricultural Mechanization', 
+      desc: 'Machinery Subsidy for Modern Farming', 
+      state: 'Central',
+      content: 'This sub-mission promotes agricultural mechanization by providing subsidies on various farm machinery and equipment. It aims to reduce the drudgery of farm operations, improve efficiency, and enhance productivity. The scheme covers tractors, harvesters, threshers, and other implements.',
+      website: 'https://farmech.gov.in'
+    },
+  ];
 
   // Sample Posts with full content
   const allPosts = [
@@ -368,6 +551,11 @@ export default function InfoScreen({ navigation }) {
     setSelectedState(state);
     setSelectedCity(''); // Reset city when state changes
     setShowStateInput(false);
+  };
+
+  const handleSchemeStateSelect = (state) => {
+    setSelectedSchemeState(state);
+    setShowSchemeStateInput(false);
   };
 
   const handleCitySelect = (city) => {
@@ -542,69 +730,147 @@ export default function InfoScreen({ navigation }) {
       </View>
     </Modal>
   );
-  const renderSchemes = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={styles.categoryContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity
-            style={[styles.categoryButton, schemeCategory === 'Central' && styles.categoryButtonActive]}
-            onPress={() => setSchemeCategory('Central')}
-          >
-            <Ionicons name="business-outline" size={18} color={schemeCategory === 'Central' ? '#FFFFFF' : '#666666'} />
-            <Text style={[styles.categoryButtonText, schemeCategory === 'Central' && styles.categoryButtonTextActive]}>
-              Central
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryButton, schemeCategory === 'Government' && styles.categoryButtonActive]}
-            onPress={() => setSchemeCategory('Government')}
-          >
-            <Ionicons name="people-outline" size={18} color={schemeCategory === 'Government' ? '#FFFFFF' : '#666666'} />
-            <Text style={[styles.categoryButtonText, schemeCategory === 'Government' && styles.categoryButtonTextActive]}>
-              Government
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryButton, schemeCategory === 'State' && styles.categoryButtonActive]}
-            onPress={() => setSchemeCategory('State')}
-          >
-            <Ionicons name="location-outline" size={18} color={schemeCategory === 'State' ? '#FFFFFF' : '#666666'} />
-            <Text style={[styles.categoryButtonText, schemeCategory === 'State' && styles.categoryButtonTextActive]}>
-              State
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryButton, schemeCategory === 'Private' && styles.categoryButtonActive]}
-            onPress={() => setSchemeCategory('Private')}
-          >
-            <Ionicons name="briefcase-outline" size={18} color={schemeCategory === 'Private' ? '#FFFFFF' : '#666666'} />
-            <Text style={[styles.categoryButtonText, schemeCategory === 'Private' && styles.categoryButtonTextActive]}>
-              Private
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
 
-      {schemes[schemeCategory].map((scheme, index) => (
-        <TouchableOpacity key={index} style={styles.schemeCard}>
-          <View style={styles.schemeIconBg}>
-            <MaterialIcons name="policy" size={24} color="#2E7D32" />
+  // Render Scheme State Selection Modal
+  const renderSchemeStateModal = () => (
+    <Modal
+      visible={showSchemeStateInput}
+      animationType="slide"
+      transparent={true}
+      onRequestClose={() => setShowSchemeStateInput(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select State</Text>
+            <TouchableOpacity onPress={() => setShowSchemeStateInput(false)}>
+              <Ionicons name="close" size={24} color="#333333" />
+            </TouchableOpacity>
           </View>
-          <View style={styles.schemeContent}>
-            <Text style={styles.schemeName}>{scheme.name}</Text>
-            <Text style={styles.schemeDesc}>{scheme.desc}</Text>
-            <View style={styles.schemeStatus}>
-              <View style={styles.statusBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>{scheme.status}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#999999" />
-            </View>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+
+          <FlatList
+            data={indianStates}
+            keyExtractor={(item) => item}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.modalItem,
+                  selectedSchemeState === item && styles.modalItemSelected
+                ]}
+                onPress={() => handleSchemeStateSelect(item)}
+              >
+                <Text style={[
+                  styles.modalItemText,
+                  selectedSchemeState === item && styles.modalItemTextSelected
+                ]}>
+                  {item}
+                </Text>
+                {selectedSchemeState === item && (
+                  <Ionicons name="checkmark" size={20} color="#2E7D32" />
+                )}
+              </TouchableOpacity>
+            )}
+            showsVerticalScrollIndicator={true}
+          />
+        </View>
+      </View>
+    </Modal>
   );
+  const renderSchemes = () => {
+    // Get schemes based on category
+    let schemesToShow = [];
+    if (schemeCategory === 'Government') {
+      schemesToShow = governmentSchemes;
+    } else if (schemeCategory === 'State' && selectedSchemeState) {
+      schemesToShow = stateSchemes[selectedSchemeState] || [];
+    }
+
+    return (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Category Buttons */}
+        <View style={styles.categoryContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <TouchableOpacity
+              style={[styles.categoryButton, schemeCategory === 'Government' && styles.categoryButtonActive]}
+              onPress={() => {
+                setSchemeCategory('Government');
+                setSelectedSchemeState(''); // Reset state selection
+              }}
+            >
+              <Ionicons name="people-outline" size={18} color={schemeCategory === 'Government' ? '#FFFFFF' : '#666666'} />
+              <Text style={[styles.categoryButtonText, schemeCategory === 'Government' && styles.categoryButtonTextActive]}>
+                Government
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.categoryButton, schemeCategory === 'State' && styles.categoryButtonActive]}
+              onPress={() => setSchemeCategory('State')}
+            >
+              <Ionicons name="location-outline" size={18} color={schemeCategory === 'State' ? '#FFFFFF' : '#666666'} />
+              <Text style={[styles.categoryButtonText, schemeCategory === 'State' && styles.categoryButtonTextActive]}>
+                State
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        {/* State Dropdown for State Schemes */}
+        {schemeCategory === 'State' && (
+          <View style={styles.stateDropdownContainer}>
+            <Text style={styles.stateDropdownLabel}>Select State</Text>
+            <TouchableOpacity
+              style={styles.stateDropdown}
+              onPress={() => setShowSchemeStateInput(true)}
+            >
+              <Text style={styles.stateDropdownText}>
+                {selectedSchemeState || 'Select State'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#666666" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Show message if state is not selected for State category */}
+        {schemeCategory === 'State' && !selectedSchemeState && (
+          <View style={styles.messageContainer}>
+            <MaterialIcons name="info-outline" size={24} color="#FF9800" />
+            <Text style={styles.messageText}>Please select a state to view state-specific schemes</Text>
+          </View>
+        )}
+
+        {/* Display Schemes */}
+        {schemesToShow.length > 0 ? (
+          schemesToShow.map((scheme, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.schemeCard}
+              onPress={() => navigation?.navigate('SchemeDetail', { scheme })}
+            >
+              <View style={styles.schemeIconBg}>
+                <MaterialIcons name="policy" size={24} color="#2E7D32" />
+              </View>
+              <View style={styles.schemeContent}>
+                <Text style={styles.schemeName}>{scheme.name}</Text>
+                <Text style={styles.schemeDesc}>{scheme.desc}</Text>
+                <View style={styles.schemeStatus}>
+                  <View style={styles.statusBadge}>
+                    <Ionicons name="location" size={12} color="#2E7D32" />
+                    <Text style={styles.statusText}>{scheme.state}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#999999" />
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : schemeCategory === 'State' && selectedSchemeState ? (
+          <View style={styles.messageContainer}>
+            <MaterialIcons name="info-outline" size={24} color="#666666" />
+            <Text style={styles.messageText}>No schemes available for {selectedSchemeState}</Text>
+          </View>
+        ) : null}
+      </ScrollView>
+    );
+  };
 
   const renderPost = () => {
     const startIndex = currentPostPage * postsPerPage;
@@ -732,6 +998,7 @@ export default function InfoScreen({ navigation }) {
       {/* Modals */}
       {renderStateModal()}
       {renderCityModal()}
+      {renderSchemeStateModal()}
     </SafeAreaView>
   );
 }
@@ -1079,6 +1346,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#2E7D32',
+  },
+  stateDropdownContainer: {
+    marginBottom: 20,
+  },
+  stateDropdownLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  stateDropdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  stateDropdownText: {
+    fontSize: 15,
+    color: '#333333',
+    fontWeight: '500',
+  },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 20,
+    gap: 12,
+  },
+  messageText: {
+    fontSize: 14,
+    color: '#E65100',
+    flex: 1,
+    lineHeight: 20,
   },
   // Updates Styles
   updatesHeader: {

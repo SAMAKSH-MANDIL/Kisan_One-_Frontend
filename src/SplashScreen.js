@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
+import { vw, vh, ms } from './utils/responsive';
 
 const { width, height } = Dimensions.get('window');
 
@@ -78,16 +79,16 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 100,
+    marginBottom: vh(8),
   },
   logoPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: vw(32),
+    height: vw(32),
+    borderRadius: vw(16),
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: vh(2.2),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -98,22 +99,22 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoText: {
-    fontSize: 60,
+    fontSize: ms(48),
   },
   logoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 60,
+    borderRadius: vw(16),
   },
   appName: {
-    fontSize: 36,
+    fontSize: ms(28),
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
   },
   tagline: {
-    fontSize: 16,
+    fontSize: ms(13),
     color: '#E8F5E8',
     textAlign: 'center',
     opacity: 0.9,
@@ -122,12 +123,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     position: 'absolute',
-    bottom: 100,
+    bottom: vh(8),
   },
   loadingDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: ms(10),
+    height: ms(10),
+    borderRadius: ms(5),
     backgroundColor: '#FFFFFF',
     marginHorizontal: 4,
     opacity: 0.3,

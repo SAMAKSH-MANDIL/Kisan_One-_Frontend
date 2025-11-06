@@ -14,47 +14,115 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function CropDoctorScreen({ navigation }) {
   const [imageUri, setImageUri] = useState(null);
+  const [showReport, setShowReport] = useState(false);
+  const [reportData, setReportData] = useState(null);
 
   const openCamera = async () => {
     try {
+      // Dynamic import to avoid loading native module at startup
       const ImagePicker = await import('expo-image-picker');
+      
+      if (!ImagePicker || !ImagePicker.requestCameraPermissionsAsync) {
+        throw new Error('ImagePicker native module not available');
+      }
+      
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Camera permission is needed.');
         return;
       }
+      
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.8,
       });
+      
       if (!result.canceled && result.assets && result.assets[0]) {
         setImageUri(result.assets[0].uri);
+        setShowReport(false);
+        setReportData(null);
       }
     } catch (err) {
-      Alert.alert('Error', 'Unable to open camera.');
+      console.error('Camera error:', err);
+      Alert.alert(
+        'Native Module Error', 
+        'expo-image-picker native module is not available.\n\n' +
+        'Please ensure:\n' +
+        '1. You are NOT using Expo Go\n' +
+        '2. The app has been rebuilt with: npx expo run:android\n' +
+        '3. The build completed successfully\n\n' +
+        'Native modules require a development build.\n\n' +
+        'Start with: npx expo start --dev-client'
+      );
     }
   };
 
   const openGallery = async () => {
     try {
+      // Dynamic import to avoid loading native module at startup
       const ImagePicker = await import('expo-image-picker');
+      
+      if (!ImagePicker || !ImagePicker.requestMediaLibraryPermissionsAsync) {
+        throw new Error('ImagePicker native module not available');
+      }
+      
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Gallery permission is needed.');
         return;
       }
+      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 0.8,
       });
+      
       if (!result.canceled && result.assets && result.assets[0]) {
         setImageUri(result.assets[0].uri);
+        setShowReport(false);
+        setReportData(null);
       }
     } catch (err) {
-      Alert.alert('Error', 'Unable to open gallery.');
+      console.error('Gallery error:', err);
+      Alert.alert(
+        'Native Module Error', 
+        'expo-image-picker native module is not available.\n\n' +
+        'Please ensure:\n' +
+        '1. You are NOT using Expo Go\n' +
+        '2. The app has been rebuilt with: npx expo run:android\n' +
+        '3. The build completed successfully\n\n' +
+        'Native modules require a development build.\n\n' +
+        'Start with: npx expo start --dev-client'
+      );
     }
+  };
+
+  const generateReport = () => {
+    // Simulate report generation - in a real app, this would call an API
+    const mockReport = {
+      disease: 'Leaf Blight',
+      confidence: '85%',
+      severity: 'Moderate',
+      crop: 'Tomato',
+      description: 'The image analysis indicates the presence of early blight on tomato leaves. This is a common fungal disease that affects tomato plants.',
+      treatment: [
+        'Remove and dispose of affected leaves immediately',
+        'Apply fungicide containing chlorothalonil or copper-based products',
+        'Improve air circulation by pruning dense foliage',
+        'Avoid overhead watering to reduce leaf wetness',
+        'Apply treatment every 7-10 days until symptoms clear'
+      ],
+      prevention: [
+        'Use disease-resistant varieties',
+        'Maintain proper spacing between plants',
+        'Rotate crops annually',
+        'Water at the base of plants, not leaves'
+      ]
+    };
+    setReportData(mockReport);
+    setShowReport(true);
   };
 
   return (
@@ -89,9 +157,73 @@ export default function CropDoctorScreen({ navigation }) {
         </View>
 
         {imageUri ? (
-          <View style={styles.previewCard}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} />
-          </View>
+          <>
+            <View style={styles.previewCard}>
+              <Image source={{ uri: imageUri }} style={styles.previewImage} />
+            </View>
+            <TouchableOpacity 
+              style={styles.generateReportBtn} 
+              onPress={generateReport}
+            >
+              <Ionicons name="document-text" size={20} color="#FFFFFF" />
+              <Text style={styles.generateReportBtnText}>Generate Report</Text>
+            </TouchableOpacity>
+            
+            {showReport && reportData && (
+              <View style={styles.reportCard}>
+                <View style={styles.reportHeader}>
+                  <Text style={styles.reportTitle}>Diagnosis Report</Text>
+                  <Ionicons name="medical" size={24} color="#22A06B" />
+                </View>
+                
+                <View style={styles.reportSection}>
+                  <Text style={styles.reportLabel}>Disease Detected:</Text>
+                  <Text style={styles.reportValue}>{reportData.disease}</Text>
+                </View>
+                
+                <View style={styles.reportRow}>
+                  <View style={styles.reportSection}>
+                    <Text style={styles.reportLabel}>Confidence:</Text>
+                    <Text style={styles.reportValue}>{reportData.confidence}</Text>
+                  </View>
+                  <View style={styles.reportSection}>
+                    <Text style={styles.reportLabel}>Severity:</Text>
+                    <Text style={styles.reportValue}>{reportData.severity}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.reportSection}>
+                  <Text style={styles.reportLabel}>Crop Type:</Text>
+                  <Text style={styles.reportValue}>{reportData.crop}</Text>
+                </View>
+                
+                <View style={styles.reportSection}>
+                  <Text style={styles.reportLabel}>Description:</Text>
+                  <Text style={styles.reportDescription}>{reportData.description}</Text>
+                </View>
+                
+                <View style={styles.reportSection}>
+                  <Text style={styles.reportLabel}>Treatment Recommendations:</Text>
+                  {reportData.treatment.map((item, index) => (
+                    <View key={index} style={styles.treatmentItem}>
+                      <Text style={styles.treatmentBullet}>•</Text>
+                      <Text style={styles.treatmentText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+                
+                <View style={styles.reportSection}>
+                  <Text style={styles.reportLabel}>Prevention Tips:</Text>
+                  {reportData.prevention.map((item, index) => (
+                    <View key={index} style={styles.treatmentItem}>
+                      <Text style={styles.treatmentBullet}>•</Text>
+                      <Text style={styles.treatmentText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
         ) : null}
 
         <Text style={styles.sectionTitle}>Tips for Better Results</Text>
@@ -132,6 +264,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+    marginTop: 30,
+
   },
   backBtn: {
     width: 44,
@@ -242,5 +376,96 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 220,
     borderRadius: 10,
+  },
+  generateReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#22A06B',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    marginTop: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  generateReportBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reportCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#22A06B',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  reportTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  reportSection: {
+    marginBottom: 16,
+  },
+  reportRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  reportLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  reportValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  reportDescription: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  treatmentItem: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
+  },
+  treatmentBullet: {
+    fontSize: 16,
+    color: '#22A06B',
+    fontWeight: '700',
+  },
+  treatmentText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
   },
 });

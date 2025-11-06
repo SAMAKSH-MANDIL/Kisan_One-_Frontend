@@ -13,7 +13,7 @@ import { useOrders } from './OrdersContext';
 
 export default function MyOrdersScreen() {
   const [activeTab, setActiveTab] = useState('All');
-  const { orders: placedOrders } = useOrders();
+  const { orders: placedOrders, addOrder } = useOrders();
 
   const tabs = ['All', 'Pending', 'Delivered', 'Cancelled'];
 
@@ -159,7 +159,23 @@ export default function MyOrdersScreen() {
                 <TouchableOpacity style={styles.actionButton}>
                   <Text style={styles.actionButtonText}>Track Order</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.secondaryButton]}
+                  onPress={() => {
+                    const today = new Date();
+                    const formattedDate = today.toISOString().split('T')[0];
+                    const newOrder = {
+                      id: Date.now().toString(),
+                      orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
+                      date: formattedDate,
+                      status: 'Pending',
+                      total: order.total,
+                      items: order.items,
+                      products: order.products,
+                    };
+                    addOrder(newOrder);
+                  }}
+                >
                   <Text style={styles.secondaryButtonText}>Reorder</Text>
                 </TouchableOpacity>
               </View>

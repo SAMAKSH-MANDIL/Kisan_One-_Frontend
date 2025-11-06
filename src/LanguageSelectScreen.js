@@ -2,27 +2,17 @@ import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage, languages } from './LanguageContext';
 
 export default function LanguageSelectScreen() {
   const navigation = useNavigation();
+  const { currentLanguage, changeLanguage } = useLanguage();
 
-  const languages = [
-    { code: 'en', name: 'English', native: 'English' },
-    { code: 'hi', name: 'Hindi', native: 'हिंदी' },
-    { code: 'bn', name: 'Bengali', native: 'বাংলা' },
-    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
-    { code: 'ka', name: 'Kannada', native: 'ಕನ್ನಡ' },
-    { code: 'mr', name: 'Marathi', native: 'मराठी' },
-    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
-    { code: 'sa', name: 'Sanskrit', native: 'संस्कृतम्' },
-    { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
-    { code: 'te', name: 'Telugu', native: 'తెలుగు' },
-    { code: 'kho', name: 'Khorta', native: 'Khorta' },
-  ];
-
-  const handleLanguageSelect = (lang) => {
-    Alert.alert('Language Selected', `${lang.name}`);
-    navigation.goBack();
+  const handleLanguageSelect = async (lang) => {
+    await changeLanguage(lang.code);
+    Alert.alert('Language Changed', `${lang.name} has been set as your preferred language.`, [
+      { text: 'OK', onPress: () => navigation.goBack() }
+    ]);
   };
 
   return (
@@ -46,7 +36,7 @@ export default function LanguageSelectScreen() {
         {languages.map((lang) => (
           <TouchableOpacity
             key={lang.code}
-            style={styles.langCard}
+            style={[styles.langCard, currentLanguage === lang.code && styles.selectedLangCard]}
             onPress={() => handleLanguageSelect(lang)}
             activeOpacity={0.7}
           >
@@ -54,9 +44,11 @@ export default function LanguageSelectScreen() {
               <Text style={styles.langName}>{lang.name}</Text>
               <Text style={styles.langNative}>{lang.native}</Text>
             </View>
-            <View style={styles.checkContainer}>
-              <Ionicons name="checkmark-circle" size={26} color="#2E7D32" />
-            </View>
+            {currentLanguage === lang.code && (
+              <View style={styles.checkContainer}>
+                <Ionicons name="checkmark-circle" size={26} color="#2E7D32" />
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -128,6 +120,10 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  selectedLangCard: {
+    borderColor: '#2E7D32',
+    backgroundColor: '#F1F8F4',
   },
 });
 

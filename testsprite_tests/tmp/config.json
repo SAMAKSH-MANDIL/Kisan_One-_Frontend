@@ -1,0 +1,12 @@
+{
+  "status": "init",
+  "executionArgs": {
+    "projectName": "kisanone-frontend-main",
+    "projectPath": "C:\\kisanone-frontend-main",
+    "testIds": [],
+    "additionalInstruction": "This is a React Native (Expo) app. Focus on key flows: Home search dropdown vertical+horizontal scrolling; AI Tools chat (text send via fixed bar) working with mocked Gemini; Cart add/increment/decrement and badge updates; bottom tab bar safe-area adherence across gesture and 3-button navigation. Mock native modules (@react-native-voice/voice, expo-location) as needed.",
+    "envs": {
+      "API_KEY": "sk-user-2b5XwK-8cxHutmlJRgp4U9fkwWIZHH4ZrL1Dkt_FGc8-doaNGW9WlP7u5mYSrTAcT9SmVGUbpxkqE22ottfMd3tk3FkpAOQHBZfM8BLA_kSz7e4vJV3-8wHmI2R9COvgsFA"
+    }
+  }
+}

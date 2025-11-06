@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,20 +15,71 @@ import {
   BackHandler,
   TextInput,
   Alert,
+  TouchableWithoutFeedback,
+  Keyboard,
+  FlatList,
+  Modal,
 } from 'react-native';
+import { LayoutAnimation, UIManager, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import { useCart } from './CartContext';
 import { Ionicons, EvilIcons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useLanguage } from './LanguageContext';
 import Voice from '@react-native-voice/voice';
+import { vh, ms } from './utils/responsive';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { addToCart, increment, decrement, items: cartItems } = useCart();
+  const { getVoiceLocale, t } = useLanguage();
   const [activeTab, setActiveTab] = useState('Home');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [zoomedImage, setZoomedImage] = useState(null);
+  
+  // Local images map to bundle assets in release APK
+  const localImageMap = {
+    '../assets/data/seed1.png': require('../assets/data/seed1.png'),
+    '../assets/data/seed2.png': require('../assets/data/seed2.png'),
+    '../assets/data/seed3.png': require('../assets/data/seed3.png'),
+    '../assets/data/seed4.png': require('../assets/data/seed4.png'),
+    '../assets/data/cropnutri1.png': require('../assets/data/cropnutri1.png'),
+    '../assets/data/cropnutri2.png': require('../assets/data/cropnutri2.png'),
+    '../assets/data/cropnutri3.png': require('../assets/data/cropnutri3.png'),
+    '../assets/data/cropnutri4.png': require('../assets/data/cropnutri4.png'),
+    '../assets/data/cropprotection1.png': require('../assets/data/cropprotection1.png'),
+    '../assets/data/cropprotection2.png': require('../assets/data/cropprotection2.png'),
+    '../assets/data/cropprotection3.png': require('../assets/data/cropprotection3.png'),
+    '../assets/data/cropprotection4.png': require('../assets/data/cropprotection4.png'),
+    '../assets/data/gardencare1.png': require('../assets/data/gardencare1.png'),
+    '../assets/data/gardencare2.png': require('../assets/data/gardencare2.png'),
+    '../assets/data/gardencare3.png': require('../assets/data/gardencare3.png'),
+    '../assets/data/gardencare4.png': require('../assets/data/gardencare4.png'),
+    '../assets/data/agriequip1.png': require('../assets/data/agriequip1.png'),
+  };
+
+  const getProductImageSource = (product) => {
+    // Priority: imageRequire > imageUri (from localImageMap) > imageUri (http) > null
+    if (product?.imageRequire) return product.imageRequire;
+    if (product?.imageUri) {
+      // Check if it's in our local map
+      if (localImageMap[product.imageUri]) {
+        return localImageMap[product.imageUri];
+      }
+      // Check if it's a remote URL
+      if (/^https?:/i.test(product.imageUri)) {
+        return { uri: product.imageUri };
+      }
+    }
+    // No valid image source
+    return null;
+  };
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const drawerWidth = Math.round(width * 0.75);
   const drawerTranslateX = useRef(new Animated.Value(-drawerWidth)).current;
@@ -37,11 +88,14 @@ export default function HomeScreen() {
   const [profileName, setProfileName] = useState('Farmer');
   const [searchQuery, setSearchQuery] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const homeSearchInputRef = useRef(null);
 
   // Calculate total quantity of items in cart
   const totalCartQuantity = cartItems.reduce((total, item) => total + item.quantity, 0);
 
-  // Load profile name from Firestore
+  // Load profile name and recent searches from Firestore
   useEffect(() => {
     const u = auth().currentUser;
     if (!u) return;
@@ -49,9 +103,139 @@ export default function HomeScreen() {
     const unsub = ref.onSnapshot((doc) => {
       const d = doc.data() || {};
       setProfileName((d.name && d.name.trim()) ? d.name : 'Farmer');
+      if (d.recentSearches && Array.isArray(d.recentSearches)) {
+        setRecentSearches(d.recentSearches.slice(0, 10));
+      } else {
+        setRecentSearches([]);
+      }
     });
     return () => unsub();
   }, []);
+
+  // Enable smooth layout transitions for dropdown (Android requires this)
+  useEffect(() => {
+    try {
+      if (Platform.OS === 'android' && UIManager && typeof UIManager.setLayoutAnimationEnabledExperimental === 'function') {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+      }
+    } catch (_) {}
+  }, []);
+
+  // Load user orders for recommendations
+  const [userOrders, setUserOrders] = useState([]);
+  useEffect(() => {
+    const u = auth().currentUser;
+    if (!u) return;
+    
+    const unsub = firestore()
+      .collection('orders')
+      .where('userId', '==', u.uid)
+      .limit(20)
+      .onSnapshot((snapshot) => {
+        if (!snapshot) {
+          setUserOrders([]);
+          return;
+        }
+        const orders = [];
+        try {
+          snapshot.forEach((doc) => {
+            if (doc && doc.exists) {
+              const data = doc.data();
+              if (data && data.items && Array.isArray(data.items)) {
+                const itemsWithTimestamp = data.items.map(item => ({
+                  ...item,
+                  orderTimestamp: data.createdAt ? data.createdAt.toMillis() : 0,
+                }));
+                orders.push(...itemsWithTimestamp);
+              }
+            }
+          });
+          
+          orders.sort((a, b) => (b.orderTimestamp || 0) - (a.orderTimestamp || 0));
+          setUserOrders(orders.slice(0, 10));
+        } catch (error) {
+          console.error('Error processing orders:', error);
+          setUserOrders([]);
+        }
+      }, (error) => {
+        console.error('Orders query error:', error);
+        if (error.code === 'failed-precondition') {
+          console.log('Firestore index not created. Recommendations will use default products.');
+        }
+        setUserOrders([]);
+      });
+    return () => unsub();
+  }, []);
+
+  // Refresh search dropdown data
+  const refreshSearchData = useCallback(async () => {
+    const u = auth().currentUser;
+    if (!u) return;
+
+    try {
+      const userDoc = await firestore().collection('users').doc(u.uid).get();
+      if (userDoc.exists) {
+        const data = userDoc.data() || {};
+        if (data.recentSearches && Array.isArray(data.recentSearches)) {
+          setRecentSearches(data.recentSearches.slice(0, 10));
+        } else {
+          setRecentSearches([]);
+        }
+      }
+
+      const ordersSnapshot = await firestore()
+        .collection('orders')
+        .where('userId', '==', u.uid)
+        .limit(20)
+        .get();
+      
+      if (ordersSnapshot && !ordersSnapshot.empty) {
+        const orders = [];
+        ordersSnapshot.forEach((doc) => {
+          if (doc && doc.exists) {
+            const data = doc.data();
+            if (data && data.items && Array.isArray(data.items)) {
+              const itemsWithTimestamp = data.items.map(item => ({
+                ...item,
+                orderTimestamp: data.createdAt ? data.createdAt.toMillis() : 0,
+              }));
+              orders.push(...itemsWithTimestamp);
+            }
+          }
+        });
+        orders.sort((a, b) => (b.orderTimestamp || 0) - (a.orderTimestamp || 0));
+        setUserOrders(orders.slice(0, 10));
+      } else {
+        setUserOrders([]);
+      }
+    } catch (error) {
+      console.error('Error refreshing search data:', error);
+    }
+  }, []);
+
+  // Save search to recent searches
+  const handleSearchSubmit = useCallback(async (query) => {
+    if (!query || !query.trim()) return;
+    
+    const trimmedQuery = query.trim();
+    
+    const updated = [trimmedQuery, ...recentSearches.filter(s => s !== trimmedQuery)].slice(0, 10);
+    setRecentSearches(updated);
+    
+    const u = auth().currentUser;
+    if (u) {
+      try {
+        await firestore().collection('users').doc(u.uid).update({
+          recentSearches: updated,
+        });
+      } catch (error) {
+        console.error('Error saving search:', error);
+      }
+    }
+    
+    setShowSearchDropdown(false);
+    setSearchQuery(trimmedQuery);
+  }, [recentSearches]);
 
   // Back button closes drawer (Android)
   useEffect(() => {
@@ -68,28 +252,48 @@ export default function HomeScreen() {
 
   // Voice recognition handlers
   useEffect(() => {
-    Voice.onSpeechStart = () => setIsListening(true);
-    Voice.onSpeechEnd = () => setIsListening(false);
-    Voice.onSpeechError = () => {
-      setIsListening(false);
-      Alert.alert('Error', 'Could not process your voice. Please try again.');
-    };
-    Voice.onSpeechResults = (e) => {
-      const result = e.value[0];
-      if (result) {
-        setSearchQuery(result);
+    try {
+      if (Voice && typeof Voice === 'object') {
+        Voice.onSpeechStart = () => setIsListening(true);
+        Voice.onSpeechEnd = () => setIsListening(false);
+        Voice.onSpeechError = () => {
+          setIsListening(false);
+          Alert.alert('Error', 'Could not process your voice. Please try again.');
+        };
+        Voice.onSpeechResults = (e) => {
+          const result = e && e.value && e.value[0];
+          if (result) {
+            setSearchQuery(result);
+            handleSearchSubmit(result);
+          }
+          setIsListening(false);
+        };
+      } else {
+        console.warn('Voice module is null. Skipping listener registration. Rebuild may be required.');
       }
-      setIsListening(false);
-    };
+    } catch (err) {
+      console.warn('Voice setup error:', err);
+    }
 
     return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
+      try {
+        if (Voice && typeof Voice.destroy === 'function') {
+          Voice.destroy().then(() => {
+            if (typeof Voice.removeAllListeners === 'function') Voice.removeAllListeners();
+          }).catch(() => {});
+        }
+      } catch (_) {}
     };
-  }, []);
+  }, [handleSearchSubmit]);
 
   const startVoiceRecognition = async () => {
     try {
-      await Voice.start('en-US');
+      if (!Voice || typeof Voice.start !== 'function') {
+        Alert.alert('Voice Not Available', 'Please rebuild the app to enable voice recognition.');
+        return;
+      }
+      const voiceLocale = getVoiceLocale();
+      await Voice.start(voiceLocale);
     } catch (e) {
       Alert.alert('Error', 'Could not start voice recognition. Please check permissions.');
     }
@@ -97,7 +301,9 @@ export default function HomeScreen() {
 
   const stopVoiceRecognition = async () => {
     try {
-      await Voice.stop();
+      if (Voice && typeof Voice.stop === 'function') {
+        await Voice.stop();
+      }
     } catch (e) {
       console.log('Error stopping voice:', e);
     }
@@ -115,17 +321,15 @@ export default function HomeScreen() {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => {
-        // Start near left edge to open, or anywhere when drawer open to close
         const nearEdge = g.moveX <= 24;
         const draggingHoriz = Math.abs(g.dx) > 10 && Math.abs(g.dy) < 20;
         return (nearEdge && draggingHoriz && !isDrawerOpen && g.dx > 0) || (isDrawerOpen && draggingHoriz);
       },
       onPanResponderMove: (_, g) => {
         let tx = isDrawerOpen ? Math.min(0, g.dx) : Math.max(-(drawerWidth - g.dx), -drawerWidth);
-        // Clamp while opening: from -drawerWidth to 0
         if (!isDrawerOpen) tx = Math.min(0, Math.max(-drawerWidth + g.dx, -drawerWidth));
         drawerTranslateX.setValue(tx);
-        const progress = 1 - Math.abs(tx) / drawerWidth; // 0..1
+        const progress = 1 - Math.abs(tx) / drawerWidth;
         overlayOpacity.setValue(progress);
       },
       onPanResponderRelease: (_, g) => {
@@ -140,6 +344,8 @@ export default function HomeScreen() {
   ).current;
 
   const openDrawer = () => {
+    setShowSearchDropdown(false);
+    Keyboard.dismiss();
     setIsDrawerOpen(true);
     Animated.parallel([
       Animated.timing(drawerTranslateX, {
@@ -180,120 +386,266 @@ export default function HomeScreen() {
   };
 
   const categories = [
-    { id: 1, name: 'Offers', icon: '🛒', color: '#FF6B6B' },
-    { id: 2, name: 'Insecticides', icon: '🧪', color: '#4ECDC4' },
-    { id: 3, name: 'Nutrients', icon: '📦', color: '#45B7D1' },
-    { id: 4, name: 'Fungicides', icon: '🌿', color: '#96CEB4' },
-    { id: 5, name: 'Vegetable', icon: '🥬', color: '#FFEAA7' },
-    { id: 6, name: 'Seeds', icon: '🌱', color: '#DDA0DD' },
-    { id: 7, name: 'Tools', icon: '🔧', color: '#98D8C8' },
-    { id: 8, name: 'Equipment', icon: '🚜', color: '#F7DC6F' },
+    { id: 0, name: 'All', imageSource: require('../assets/data/seeds.png') },
+    { id: 1, name: 'Seeds', imageSource: require('../assets/data/seeds.png') },
+    { id: 2, name: 'Crop Nutrition', imageSource: require('../assets/data/Crop Nutrition.png') },
+    { id: 3, name: 'Crop Protection', imageSource: require('../assets/data/Crop Protection.png') },
+    { id: 4, name: 'Garden Care', imageSource: require('../assets/data/Garden Care.png') },
+    { id: 5, name: 'Agri Equipment', imageSource: require('../assets/data/Agri Equipment.png') },
   ];
 
   const recommendedProducts = [
+    // Seeds
     {
-      id: 1,
-      name: 'Geolife No Virus Bio Viricide',
-      brand: 'Geolife Agritech',
-      price: '₹285',
-      originalPrice: '₹700',
-      discount: '59% OFF',
-      size: '250 ml',
-      saved: '₹415',
-      image: '🧪',
+      id: 1001,
+      name: 'Farmson Biotech FB GRIVA Pea Seeds 500GM',
+      brand: 'Farmson Biotech',
+      price: '₹344.00',
+      originalPrice: '₹398.00',
+      discount: '14% OFF',
+      size: '500 GM',
+      saved: '₹54.00',
+      imageRequire: require('../assets/data/seed1.png'),
+      category: 'Seeds',
     },
     {
-      id: 2,
-      name: 'Antracol Fungicide - Propineb',
-      brand: 'Bayer',
-      price: '₹277',
-      originalPrice: '₹350',
-      discount: '21% OFF',
-      size: '250 gms',
-      saved: '₹73',
-      image: '🌿',
+      id: 1002,
+      name: 'Farmson Biotech FB SAKET F1 Hybrid Okra (Bhindi) Seeds',
+      brand: 'Farmson Biotech',
+      price: '₹929.00',
+      originalPrice: '₹1,118.00',
+      discount: '17% OFF',
+      saved: '₹189.00',
+      imageRequire: require('../assets/data/seed2.png'),
+      category: 'Seeds',
     },
     {
-      id: 3,
-      name: 'Fantac Plus Growth Promoter',
-      brand: 'Coromandel International',
-      price: '₹289',
-      originalPrice: '₹430',
-      discount: '33% OFF',
-      size: '100 ml',
-      saved: '₹141',
-      image: '💧',
-    },
-  ];
-
-  const bestSellingProducts = [
-    {
-      id: 1,
-      name: 'UPL Saathi Herbicide',
-      brand: 'UPL',
-      price: '₹1,450',
-      originalPrice: '₹1,800',
-      discount: '19% OFF',
-      size: '500 ml',
-      saved: '₹350',
-      image: '🌾',
+      id: 1003,
+      name: 'Farmson Biotech FB MARUTI F1 Hybrid Corn Seeds 500GM',
+      brand: 'Farmson Biotech',
+      price: '₹1,379.00',
+      originalPrice: '₹1,558.00',
+      discount: '11% OFF',
+      size: '500 GM',
+      badge: '100+ Farmers Have ordered recently!',
+      saved: '₹179.00',
+      imageRequire: require('../assets/data/seed3.png'),
+      category: 'Seeds',
     },
     {
-      id: 2,
-      name: 'Roundup Glyphosate',
-      brand: 'Bayer',
-      price: '₹2,200',
-      originalPrice: '₹2,600',
-      discount: '15% OFF',
-      size: '1 liter',
-      saved: '₹400',
-      image: '🌿',
+      id: 1004,
+      name: 'Farmson Biotech FB SUVARN Clusterbean Seeds 250GM',
+      brand: 'Farmson Biotech',
+      price: '₹309.00',
+      originalPrice: '₹398.00',
+      discount: '22% OFF',
+      size: '250 GM',
+      badge: '100+ Farmers Have ordered recently!',
+      saved: '₹89.00',
+      imageRequire: require('../assets/data/seed4.png'),
+      category: 'Seeds',
+    },
+    // Crop Nutrition
+    {
+      id: 2001,
+      name: 'Katyayani Activated Humic Acid + Fulvic Acid 98 Fertilizer',
+      brand: 'Katyayani Organics',
+      price: '₹412.00',
+      originalPrice: '₹450.00',
+      discount: '8% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropnutri1.png'),
+      category: 'Crop Nutrition',
     },
     {
-      id: 3,
-      name: 'Multiplex Falcon Growth Promoter',
-      brand: 'Multiplex',
-      price: '₹320',
-      originalPrice: '₹450',
-      discount: '29% OFF',
-      size: '250 ml',
-      saved: '₹130',
-      image: '💧',
+      id: 2002,
+      name: 'Katyayani Seaweed Extract Liquid Organic fertilizer',
+      brand: 'Katyayani Organics',
+      price: '₹398.00',
+      originalPrice: '',
+      discount: '5% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropnutri2.png'),
+      category: 'Crop Nutrition',
     },
     {
-      id: 4,
-      name: 'Syngenta Nativo Fungicide',
-      brand: 'Syngenta',
-      price: '₹3,500',
-      originalPrice: '₹4,000',
-      discount: '13% OFF',
-      size: '1 kg',
-      saved: '₹500',
-      image: '🛡️',
+      id: 2003,
+      name: 'katyayani Pro Grow (Gibberellic Acid 0.001% L) Plant Growth Regulator',
+      brand: 'Katyayani Organics',
+      price: '₹622.00',
+      originalPrice: '₹930.00',
+      discount: '36% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropnutri3.png'),
+      category: 'Crop Nutrition',
     },
     {
-      id: 5,
-      name: 'Indian Organic Vermicompost',
-      brand: 'GreenEarth',
-      price: '₹150',
-      originalPrice: '₹200',
+      id: 2004,
+      name: 'Agri Venture GIBBER Gibberelic Acid 0.001% SL',
+      brand: 'Agri Venture',
+      price: '₹475.00',
+      originalPrice: '₹499.00',
+      discount: '9% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropnutri4.png'),
+      category: 'Crop Nutrition',
+    },
+    // Crop Protection
+    {
+      id: 3001,
+      name: 'Katyayani EMA 5 Emamectin Benzoate 5 SG Chemical Insecticide',
+      brand: 'Katyayani Organics',
+      price: '₹437.00',
+      originalPrice: '₹510.00',
+      discount: '14% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropprotection1.png'),
+      category: 'Crop Protection',
+    },
+    {
+      id: 3002,
+      name: 'Agri Venture Carzone Chlorantraniliprole 18.5% SC Chemical Insecticide',
+      brand: 'Agri Venture',
+      price: '₹399.00',
+      originalPrice: '₹1,600.00',
+      discount: '79% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropprotection2.png'),
+      category: 'Crop Protection',
+    },
+    {
+      id: 3003,
+      name: 'Agri Venture Emabenz Gold Emamectin Benzoate 5% SG Chemical Insecticide',
+      brand: 'Agri Venture',
+      price: '₹399.00',
+      originalPrice: '₹499.00',
+      discount: '20% OFF',
+      imageRequire: require('../assets/data/cropprotection3.png'),
+      category: 'Crop Protection',
+    },
+    {
+      id: 3004,
+      name: 'Katyayani Antivirus viricide Special Chilli Tomato Brinjal',
+      brand: 'Katyayani Organics',
+      price: '₹463.00',
+      originalPrice: '₹741.00',
+      discount: '47% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropprotection4.png'),
+      category: 'Crop Protection',
+    },
+    // Garden Care
+    {
+      id: 4001,
+      name: 'Money Marble Pothos',
+      brand: 'NURSERY NISARGA',
+      price: '₹261.00',
+      originalPrice: '₹349.00',
       discount: '25% OFF',
-      size: '5 kg',
-      saved: '₹50',
-      image: '🌱',
+      imageRequire: require('../assets/data/gardencare1.png'),
+      category: 'Garden Care',
+    },
+    {
+      id: 4002,
+      name: 'Manjula Variegated Pothos',
+      brand: 'NURSERY NISARGA',
+      price: '₹313.00',
+      originalPrice: '₹399.00',
+      discount: '22% OFF',
+      imageRequire: require('../assets/data/gardencare2.png'),
+      category: 'Garden Care',
+    },
+    {
+      id: 4003,
+      name: 'Manjula Green Pothos',
+      brand: 'NURSERY NISARGA',
+      price: '₹261.00',
+      originalPrice: '₹349.00',
+      discount: '25% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/gardencare3.png'),
+      category: 'Garden Care',
+    },
+    {
+      id: 4004,
+      name: 'Golden Money Plant',
+      brand: 'NURSERY NISARGA',
+      price: '₹261.00',
+      originalPrice: '₹349.00',
+      discount: '25% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/gardencare4.png'),
+      category: 'Garden Care',
+    },
+    // Agri Equipment
+    {
+      id: 5001,
+      name: 'SSE450 HANDY FOGGING MACHINE THERMAL',
+      brand: 'SAI SHREE ENTERPRISES',
+      price: '₹7,670.00',
+      originalPrice: '₹20,000.00',
+      discount: '62% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/agriequip1.png'),
+      category: 'Agri Equipment',
     },
   ];
 
+  const bestSellingProducts = [];
   const allProducts = [...bestSellingProducts, ...recommendedProducts];
 
-  // Filter products based on search query
+  // Get recommended products based on user orders
+  const getRecommendedFromOrders = () => {
+    if (!userOrders || !Array.isArray(userOrders) || userOrders.length === 0) {
+      return recommendedProducts.slice(0, 3);
+    }
+    
+    try {
+      const orderedProductNames = [...new Set(userOrders
+        .filter(item => item && item.name)
+        .map(item => item.name.toLowerCase()))];
+      
+      if (orderedProductNames.length === 0) {
+        return recommendedProducts.slice(0, 3);
+      }
+      
+      const recommended = allProducts.filter(product => {
+        if (!product || !product.name) return false;
+        const productName = product.name.toLowerCase();
+        return orderedProductNames.some(ordered => 
+          productName.includes(ordered) || ordered.includes(productName) ||
+          (product.brand && product.brand.toLowerCase() === ordered)
+        );
+      });
+      
+      return recommended.length > 0 ? recommended.slice(0, 3) : recommendedProducts.slice(0, 3);
+    } catch (error) {
+      console.error('Error getting recommended products:', error);
+      return recommendedProducts.slice(0, 3);
+    }
+  };
+
+  const trendingProducts = allProducts.slice(0, 20);
+
+  // Filter products based on search query and category
   const filterProducts = (products) => {
-    if (!searchQuery.trim()) return products;
-    const query = searchQuery.toLowerCase();
-    return products.filter(product =>
-      product.name.toLowerCase().includes(query) ||
-      product.brand.toLowerCase().includes(query)
-    );
+    let result = products;
+    
+    // Filter by category (if not "All")
+    if (selectedCategory && selectedCategory !== 'All') {
+      result = result.filter(p => (p.category || '').toLowerCase() === selectedCategory.toLowerCase());
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(product =>
+        product.name.toLowerCase().includes(query) ||
+        product.brand.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
   };
 
   const filteredRecommended = filterProducts(recommendedProducts);
@@ -323,7 +675,7 @@ export default function HomeScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#2E7D32" translucent={false} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets?.top || 0, 10) + 12 }]}>
         <View style={styles.headerContent}>
           {/* User Profile & Weather */}
           <View style={styles.userSection}>
@@ -341,7 +693,6 @@ export default function HomeScreen() {
 
           {/* Rewards & Actions */}
           <View style={styles.actionsSection}>
-
             <TouchableOpacity style={styles.actionButton}>
               <Text style={styles.actionIcon}>🔔</Text>
             </TouchableOpacity>
@@ -361,18 +712,38 @@ export default function HomeScreen() {
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View 
+          style={[styles.searchContainer, isDrawerOpen && { zIndex: 0 }]}
+          pointerEvents={isDrawerOpen ? 'none' : 'auto'}
+        >
           <View style={styles.searchBar}>
             <EvilIcons name="search" size={22} color="#666666" style={{ marginRight: 12 }} />
             <TextInput
+              ref={homeSearchInputRef}
               style={styles.searchInput}
-              placeholder="Search products here"
+              placeholder={t('searchProducts')}
               placeholderTextColor="#999999"
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+                try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+                setShowSearchDropdown(true);
+              }}
+              onFocus={async () => {
+                try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+                setShowSearchDropdown(true);
+                await refreshSearchData();
+              }}
+              onSubmitEditing={() => handleSearchSubmit(searchQuery)}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} style={{ marginRight: 8 }}>
+              <TouchableOpacity 
+                onPress={() => {
+                  setSearchQuery('');
+                  setShowSearchDropdown(false);
+                }} 
+                style={{ marginRight: 8 }}
+              >
                 <EvilIcons name="close" size={18} color="#666666" />
               </TouchableOpacity>
             )}
@@ -384,33 +755,197 @@ export default function HomeScreen() {
                 <Ionicons name={isListening ? "mic" : "mic-outline"} size={18} color="#FFFFFF" />
               </TouchableOpacity>
               <View style={styles.separator} />
-            {/* Image search icon temporarily disabled per request */}
-            {false && (
-              <TouchableOpacity style={styles.scanButton}>
-                <MaterialIcons name="image-search" size={24} color="#666666" />
-              </TouchableOpacity>
-            )}
             </View>
           </View>
+          
+          {/* Search Dropdown */}
+          {showSearchDropdown && (
+            <View style={[styles.searchDropdown, { paddingBottom: 8 + (insets?.bottom || 0) }]}>
+              <View style={{ alignItems: 'center', paddingTop: 6, paddingBottom: 2 }}>
+                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0' }} />
+              </View>
+              <ScrollView 
+                style={styles.dropdownScrollView}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+                keyboardShouldPersistTaps="always"
+                decelerationRate="normal"
+                bounces={true}
+                overScrollMode="always"
+                scrollEnabled={true}
+                keyboardDismissMode="on-drag"
+                scrollEventThrottle={16}
+                contentContainerStyle={{ paddingBottom: 12 + (insets?.bottom || 0) }}
+              >
+                {/* Recently Searched */}
+                {recentSearches.length > 0 && (
+                  <View style={styles.dropdownSection}>
+                    <Text style={styles.dropdownSectionTitleBold}>{t('recentSearches')}</Text>
+                    <FlatList
+                      data={(recentSearches || []).filter(Boolean)}
+                      keyExtractor={(item, idx) => `${item}-${idx}`}
+                      renderItem={({ item: search }) => (
+                        <TouchableOpacity
+                          style={styles.recentSearchCard}
+                          onPress={() => {
+                            setSearchQuery(search);
+                            handleSearchSubmit(search);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.recentSearchIcon}>
+                            <Ionicons name="time-outline" size={20} color="#666666" />
+                          </View>
+                          <Text style={styles.recentSearchText} numberOfLines={2}>{search}</Text>
+                        </TouchableOpacity>
+                      )}
+                      horizontal
+                      showsHorizontalScrollIndicator={true}
+                      contentContainerStyle={styles.horizontalScrollContent}
+                      nestedScrollEnabled
+                      decelerationRate="fast"
+                      snapToAlignment="start"
+                      bounces
+                    />
+                  </View>
+                )}
+                
+                {/* Recommended Products */}
+                <View style={styles.dropdownSection}>
+                  <Text style={styles.dropdownSectionTitleBold}>{t('recommendedForYou')}</Text>
+                  <FlatList
+                    data={(getRecommendedFromOrders() || recommendedProducts).slice(0, 30).filter(p => p && p.id)}
+                    keyExtractor={(item, idx) => `rec-${item.id}-${idx}`}
+                    renderItem={({ item: product, index: idx }) => (
+                      <TouchableOpacity
+                        key={`rec-${product.id}-${idx}`}
+                        style={styles.dropdownProductCard}
+                        onPress={() => {
+                          if (product.name) {
+                            setSearchQuery(product.name);
+                            handleSearchSubmit(product.name);
+                            navigation.navigate('ProductDetail', { product });
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.dropdownProductCardImage}>
+                          {getProductImageSource(product) ? (
+                            <Image source={getProductImageSource(product)} style={styles.dropdownProductImage} />
+                          ) : (
+                            <Text style={styles.dropdownProductCardEmoji}>📦</Text>
+                          )}
+                        </View>
+                        <Text style={styles.dropdownProductCardText} numberOfLines={2}>{product.name || ''}</Text>
+                        <Text style={styles.dropdownProductCardBrand} numberOfLines={1}>{product.brand || ''}</Text>
+                        <Text style={styles.dropdownProductCardPrice}>{product.price || ''}</Text>
+                      </TouchableOpacity>
+                    )}
+                    horizontal
+                    showsHorizontalScrollIndicator={true}
+                    contentContainerStyle={styles.horizontalScrollContent}
+                    nestedScrollEnabled
+                    decelerationRate="fast"
+                    snapToAlignment="start"
+                    bounces
+                  />
+                </View>
+                
+                {/* Popular Products */}
+                <View style={styles.dropdownSection}>
+                  <Text style={styles.dropdownSectionTitleBold}>{t('popularProducts')}</Text>
+                  <FlatList
+                    data={(trendingProducts || []).slice(0, 20).filter(p => p && p.id)}
+                    keyExtractor={(item, idx) => `pop-${item.id}-${idx}`}
+                    renderItem={({ item: product, index: idx }) => (
+                      <TouchableOpacity
+                        key={`pop-${product.id}-${idx}`}
+                        style={styles.dropdownProductCard}
+                        onPress={() => {
+                          if (product.name) {
+                            setSearchQuery(product.name);
+                            handleSearchSubmit(product.name);
+                            navigation.navigate('ProductDetail', { product });
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.dropdownProductCardImage}>
+                          {getProductImageSource(product) ? (
+                            <Image source={getProductImageSource(product)} style={styles.dropdownProductImage} />
+                          ) : (
+                            <Text style={styles.dropdownProductCardEmoji}>📦</Text>
+                          )}
+                        </View>
+                        <Text style={styles.dropdownProductCardText} numberOfLines={2}>{product.name || ''}</Text>
+                        <Text style={styles.dropdownProductCardBrand} numberOfLines={1}>{product.brand || ''}</Text>
+                        <Text style={styles.dropdownProductCardPrice}>{product.price || ''}</Text>
+                      </TouchableOpacity>
+                    )}
+                    horizontal
+                    showsHorizontalScrollIndicator={true}
+                    contentContainerStyle={styles.horizontalScrollContent}
+                    nestedScrollEnabled
+                    decelerationRate="fast"
+                    snapToAlignment="start"
+                    bounces
+                  />
+                </View>
+              </ScrollView>
+            </View>
+          )}
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Click outside to close dropdown */}
+      {showSearchDropdown && (
+        <TouchableWithoutFeedback onPress={() => {
+          try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+          setShowSearchDropdown(false);
+          Keyboard.dismiss();
+        }}>
+          <View style={styles.dropdownOverlay} />
+        </TouchableWithoutFeedback>
+      )}
+
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!showSearchDropdown}
+        onScrollBeginDrag={() => { if (!showSearchDropdown) { try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {} } setShowSearchDropdown(false); }}
+        contentContainerStyle={{ paddingBottom: (insets?.bottom || 0) + 16 }}
+      >
         {/* Categories */}
         <View style={styles.categoriesContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {categories.map((category) => (
-              <TouchableOpacity key={category.id} style={styles.categoryItem}>
-                <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                  <Text style={styles.categoryEmoji}>{category.icon}</Text>
-                </View>
-                <Text style={styles.categoryName}>{category.name}</Text>
-              </TouchableOpacity>
-            ))}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryItem,
+                selectedCategory === category.name && styles.categoryItemActive
+              ]}
+              onPress={() => {
+                setSelectedCategory(category.name);
+                setSearchQuery('');
+              }}
+            >
+              <View style={[
+                styles.categoryIcon,
+                selectedCategory === category.name && styles.categoryIconActive
+              ]}>
+                <Image source={category.imageSource || { uri: category.imageUri }} style={styles.categoryImage} />
+              </View>
+              <Text style={[
+                styles.categoryName,
+                selectedCategory === category.name && styles.categoryNameActive
+              ]}>{category.name}</Text>
+            </TouchableOpacity>
+          ))}
           </ScrollView>
         </View>
 
-        {/* Banner - Only Photo */}
+        {/* Banner */}
         <View style={styles.imageBannerContainer}>
           <View style={styles.imageBanner}>
             <Text style={styles.bannerImageEmoji}>🌾🏭</Text>
@@ -420,13 +955,12 @@ export default function HomeScreen() {
         {/* Brands Section */}
         <View style={styles.brandsSectionContainer}>
           <View style={styles.brandsSectionHeader}>
-            <Text style={styles.brandsSectionTitle}>Popular Brands</Text>
+            <Text style={styles.brandsSectionTitle}>{t('brands')}</Text>
             <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('BrandsViewAll')}>
-              <Text style={styles.viewAllBtnText}>View All</Text>
+              <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Brands Grid - 3 rows x 3 columns */}
           <View style={styles.brandsGrid}>
             {brands.map((brand) => (
               <TouchableOpacity key={brand.id} style={styles.brandCard} onPress={() => navigation.navigate('BrandDetail', { brand })}>
@@ -442,21 +976,28 @@ export default function HomeScreen() {
         {/* Recommended Products */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recommended Products</Text>
+            <Text style={styles.sectionTitle}>{t('recommended')}</Text>
             <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'recommended', baseProducts: recommendedProducts })}>
-              <Text style={styles.viewAllBtnText}>View All</Text>
+              <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
             {filteredRecommended.map((product) => (
               <TouchableOpacity key={product.id} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
-                <View style={styles.productImage}>
-                  <Text style={styles.productEmoji}>{product.image}</Text>
-                </View>
+                <TouchableOpacity 
+                  style={styles.productImage}
+                  onPress={() => setZoomedImage(getProductImageSource(product))}
+                >
+                  {getProductImageSource(product) ? (
+                    <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                  ) : (
+                    <Text style={styles.productEmoji}>📦</Text>
+                  )}
+                </TouchableOpacity>
                 <Text style={styles.productName} numberOfLines={2}>
                   {product.name}
                 </Text>
@@ -486,7 +1027,7 @@ export default function HomeScreen() {
                     name: product.name,
                     brand: product.brand,
                     priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image,
+                    image: product.image || product.imageUri,
                   })}>
                     <Text style={styles.addToCartText}>Add to Cart</Text>
                   </TouchableOpacity>
@@ -505,15 +1046,22 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
             {filteredRecommended.slice(0, 2).map((product) => (
               <TouchableOpacity key={`offer-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
-                <View style={styles.productImage}>
-                  <Text style={styles.productEmoji}>{product.image}</Text>
-                </View>
+                <TouchableOpacity 
+                  style={styles.productImage}
+                  onPress={() => setZoomedImage(getProductImageSource(product))}
+                >
+                  {getProductImageSource(product) ? (
+                    <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                  ) : (
+                    <Text style={styles.productEmoji}>📦</Text>
+                  )}
+                </TouchableOpacity>
                 <Text style={styles.productName} numberOfLines={2}>
                   {product.name}
                 </Text>
@@ -543,7 +1091,7 @@ export default function HomeScreen() {
                     name: product.name,
                     brand: product.brand,
                     priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image,
+                    image: product.image || product.imageUri,
                   })}>
                     <Text style={styles.addToCartText}>Add to Cart</Text>
                   </TouchableOpacity>
@@ -554,61 +1102,70 @@ export default function HomeScreen() {
         </View>
 
         {/* Best Selling Products */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Best Selling Products</Text>
-            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
-              <Text style={styles.viewAllBtnText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {filteredBestSelling.map((product) => (
-              <TouchableOpacity key={`best-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{product.discount}</Text>
-                </View>
-                <View style={styles.productImage}>
-                  <Text style={styles.productEmoji}>{product.image}</Text>
-                </View>
-                <Text style={styles.productName} numberOfLines={2}>
-                  {product.name}
-                </Text>
-                <Text style={styles.productBrand}>{product.brand}</Text>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.currentPrice}>{product.price}</Text>
-                  <Text style={styles.originalPrice}>{product.originalPrice}</Text>
-                </View>
-                <View style={styles.savedContainer}>
-                  <Text style={styles.savedIcon}>💚</Text>
-                  <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                </View>
-                <Text style={styles.productSize}>Size {product.size}</Text>
-                {cartItems.find((it) => it.id === product.id) ? (
-                  <View style={styles.qtyControls}>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
-                      <Text style={styles.qtyBtnText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
-                      <Text style={styles.qtyBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart({
-                    id: product.id,
-                    name: product.name,
-                    brand: product.brand,
-                    priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image,
-                  })}>
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </TouchableOpacity>
-                )}
+        {filteredBestSelling.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{t('bestSelling')}</Text>
+              <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
+                <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {filteredBestSelling.map((product) => (
+                <TouchableOpacity key={`best-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountText}>{product.discount}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.productImage}
+                    onPress={() => setZoomedImage(getProductImageSource(product))}
+                  >
+                    {getProductImageSource(product) ? (
+                      <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                    ) : (
+                      <Text style={styles.productEmoji}>📦</Text>
+                    )}
+                  </TouchableOpacity>
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {product.name}
+                  </Text>
+                  <Text style={styles.productBrand}>{product.brand}</Text>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.currentPrice}>{product.price}</Text>
+                    <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                  </View>
+                  <View style={styles.savedContainer}>
+                    <Text style={styles.savedIcon}>💚</Text>
+                    <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                  </View>
+                  <Text style={styles.productSize}>Size {product.size}</Text>
+                  {cartItems.find((it) => it.id === product.id) ? (
+                    <View style={styles.qtyControls}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
+                        <Text style={styles.qtyBtnText}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
+                        <Text style={styles.qtyBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart({
+                      id: product.id,
+                      name: product.name,
+                      brand: product.brand,
+                      priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
+                      image: product.image || product.imageUri,
+                    })}>
+                      <Text style={styles.addToCartText}>Add to Cart</Text>
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Products - All (grid 2 per row) */}
         <View style={styles.sectionContainer}>
@@ -623,9 +1180,16 @@ export default function HomeScreen() {
                     <Text style={styles.discountText}>{product.discount}</Text>
                   </View>
                 ) : null}
-                <View style={styles.productImage}>
-                  <Text style={styles.productEmoji}>{product.image}</Text>
-                </View>
+                <TouchableOpacity 
+                  style={styles.productImage}
+                  onPress={() => setZoomedImage(getProductImageSource(product))}
+                >
+                  {getProductImageSource(product) ? (
+                    <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                  ) : (
+                    <Text style={styles.productEmoji}>📦</Text>
+                  )}
+                </TouchableOpacity>
                 <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
                 <Text style={styles.productBrand}>{product.brand}</Text>
                 <View style={styles.priceContainer}>
@@ -657,7 +1221,7 @@ export default function HomeScreen() {
                     name: product.name,
                     brand: product.brand,
                     priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image,
+                    image: product.image || product.imageUri,
                   })}>
                     <Text style={styles.addToCartText}>Add to Cart</Text>
                   </TouchableOpacity>
@@ -667,6 +1231,36 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Image Zoom Modal */}
+      <Modal
+        visible={zoomedImage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setZoomedImage(null)}
+      >
+        <TouchableOpacity 
+          style={styles.zoomModalOverlay}
+          activeOpacity={1}
+          onPress={() => setZoomedImage(null)}
+        >
+          <View style={styles.zoomModalContent}>
+            {zoomedImage && (
+              <Image 
+                source={zoomedImage} 
+                style={styles.zoomedImage}
+                resizeMode="contain"
+              />
+            )}
+            <TouchableOpacity 
+              style={styles.closeZoomButton}
+              onPress={() => setZoomedImage(null)}
+            >
+              <Ionicons name="close" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Slide-in Drawer */}
       {isDrawerOpen && (
@@ -807,6 +1401,135 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginTop: 8,
+    position: 'relative',
+    zIndex: 1000,
+  },
+  searchDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginTop: 8,
+    paddingVertical: 8,
+    maxHeight: Dimensions.get('window').height * 0.7, // 70% of screen height
+    minHeight: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    zIndex: 3000,
+  },
+  dropdownScrollView: {
+    flex: 1,
+    paddingBottom: 8,
+  },
+  dropdownSection: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownSectionTitleBold: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  horizontalScrollContent: {
+    paddingRight: 16,
+    paddingTop: 4,
+  },
+  // Recent Searches - Circular Cards
+  recentSearchCard: {
+    width: 96,
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  recentSearchIcon: {
+    width: 84,
+    height: 84,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  recentSearchText: {
+    fontSize: 12,
+    color: '#0F172A',
+    textAlign: 'center',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  // Product Cards inside dropdown (horizontal menus)
+  dropdownProductCard: {
+    width: 150,
+    marginRight: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: 190,
+  },
+  dropdownProductCardImage: {
+    width: '100%',
+    height: 108,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  dropdownProductCardEmoji: {
+    fontSize: 50,
+  },
+  dropdownProductCardText: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 6,
+    minHeight: 34,
+  },
+  dropdownProductCardBrand: {
+    fontSize: 11,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  dropdownProductCardPrice: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
   },
   searchBar: {
     flexDirection: 'row',
@@ -876,6 +1599,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
+    zIndex: 2000,
   },
   drawer: {
     height: '100%',
@@ -950,9 +1674,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    overflow: 'hidden',
   },
-  categoryEmoji: {
-    fontSize: 24,
+  categoryImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    resizeMode: 'cover',
   },
   categoryName: {
     fontSize: 12,
@@ -1074,11 +1802,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginLeft: 16,
+    marginRight: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   discountBadge: {
     backgroundColor: '#FF6B6B',
@@ -1103,6 +1834,11 @@ const styles = StyleSheet.create({
   },
   productEmoji: {
     fontSize: 40,
+  },
+  productImageTag: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
   },
   productName: {
     fontSize: 14,
@@ -1155,7 +1891,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   imageBanner: {
-    height: 150,
+    height: vh(22),
     backgroundColor: '#E8F5E8',
     borderRadius: 16,
     justifyContent: 'center',

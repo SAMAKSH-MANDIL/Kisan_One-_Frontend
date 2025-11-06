@@ -9,15 +9,57 @@ import {
   StatusBar,
   Dimensions,
   Alert,
+  Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from './CartContext';
 import { useOrders } from './OrdersContext';
 import { useStock } from './StockContext';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
+// Map of local asset paths used in product.imageUri to require()
+const localImageMap = {
+  '../assets/data/seed1.png': require('../assets/data/seed1.png'),
+  '../assets/data/seed2.png': require('../assets/data/seed2.png'),
+  '../assets/data/seed3.png': require('../assets/data/seed3.png'),
+  '../assets/data/seed4.png': require('../assets/data/seed4.png'),
+  '../assets/data/cropnutri1.png': require('../assets/data/cropnutri1.png'),
+  '../assets/data/cropnutri2.png': require('../assets/data/cropnutri2.png'),
+  '../assets/data/cropnutri3.png': require('../assets/data/cropnutri3.png'),
+  '../assets/data/cropnutri4.png': require('../assets/data/cropnutri4.png'),
+  '../assets/data/cropprotection1.png': require('../assets/data/cropprotection1.png'),
+  '../assets/data/cropprotection2.png': require('../assets/data/cropprotection2.png'),
+  '../assets/data/cropprotection3.png': require('../assets/data/cropprotection3.png'),
+  '../assets/data/cropprotection4.png': require('../assets/data/cropprotection4.png'),
+  '../assets/data/gardencare1.png': require('../assets/data/gardencare1.png'),
+  '../assets/data/gardencare2.png': require('../assets/data/gardencare2.png'),
+  '../assets/data/gardencare3.png': require('../assets/data/gardencare3.png'),
+  '../assets/data/gardencare4.png': require('../assets/data/gardencare4.png'),
+  '../assets/data/agriequip1.png': require('../assets/data/agriequip1.png'),
+};
+
 const productDescriptions = {
+  'Farmson Biotech FB GRIVA Pea Seeds 500GM': 'Premium quality pea seeds with high germination rate. Ideal for home gardens and commercial farming. Disease resistant variety with excellent yield.',
+  'Farmson Biotech FB SAKET F1 Hybrid Okra (Bhindi) Seeds': 'High yielding F1 hybrid okra seeds. Produces uniform, tender fruits with excellent taste. Resistant to common diseases and suitable for all seasons.',
+  'Farmson Biotech FB MARUTI F1 Hybrid Corn Seeds 500GM': 'Superior F1 hybrid corn variety with high sugar content. Produces large, sweet cobs perfect for fresh consumption and processing.',
+  'Farmson Biotech FB SUVARN Clusterbean Seeds 250GM': 'Top quality clusterbean (guar) seeds with excellent pod quality. Suitable for vegetable production with good yield potential.',
+  'Katyayani Activated Humic Acid + Fulvic Acid 98 Fertilizer': 'Premium organic fertilizer enriched with humic and fulvic acids. Improves soil structure, nutrient uptake, and overall plant health.',
+  'Katyayani Seaweed Extract Liquid Organic fertilizer': 'Natural seaweed extract rich in micronutrients and growth hormones. Enhances plant growth, stress tolerance, and crop quality.',
+  'katyayani Pro Grow (Gibberellic Acid 0.001% L) Plant Growth Regulator': 'Advanced plant growth regulator for improved flowering, fruit setting, and overall plant development. Increases crop yield significantly.',
+  'Agri Venture GIBBER Gibberelic Acid 0.001% SL': 'High-quality gibberellic acid solution for promoting plant growth and breaking seed dormancy. Ideal for various crops.',
+  'Katyayani EMA 5 Emamectin Benzoate 5 SG Chemical Insecticide': 'Effective insecticide for controlling caterpillars and other leaf-eating pests. Quick action with long-lasting protection.',
+  'Agri Venture Carzone Chlorantraniliprole 18.5% SC Chemical Insecticide': 'Broad-spectrum insecticide with excellent efficacy against various insect pests. Safe for beneficial insects when used as directed.',
+  'Agri Venture Emabenz Gold Emamectin Benzoate 5% SG Chemical Insecticide': 'Premium quality insecticide for effective control of lepidopteran pests. Provides extended protection with minimal environmental impact.',
+  'Katyayani Antivirus viricide Special Chilli Tomato Brinjal': 'Specialized viricide for protecting vegetable crops from viral diseases. Safe and effective formulation for organic farming.',
+  'Money Marble Pothos': 'Beautiful variegated pothos plant perfect for indoor decoration. Low maintenance with air-purifying qualities.',
+  'Manjula Variegated Pothos': 'Stunning variegated pothos variety with cream and green leaves. Excellent for hanging baskets and home decor.',
+  'Manjula Green Pothos': 'Classic green pothos plant known for its hardy nature and easy care. Perfect for beginners and experienced gardeners.',
+  'Golden Money Plant': 'Popular golden variety of money plant. Brings prosperity and purifies indoor air naturally.',
+  'SSE450 HANDY FOGGING MACHINE THERMAL': 'Professional-grade thermal fogging machine for pest control and sanitization. Portable and efficient for large areas.',
   'Geolife No Virus Bio Viricide': 'Advanced bio-viricide solution for effective protection against plant viruses. Safe for use on all crops and environmentally friendly.',
   'Antracol Fungicide - Propineb': 'Broad-spectrum fungicide providing excellent protection against a wide range of fungal diseases in various crops.',
   'Fantac Plus Growth Promoter': 'Premium growth promoter that enhances plant growth, flowering, and fruit development while improving overall crop yield.',
@@ -29,11 +71,56 @@ const productDescriptions = {
   default: 'High-quality agricultural product designed to enhance crop productivity and plant health.',
 };
 
-// Removed random stock function - using StockContext instead
+// Helper function to get product image source (same logic as HomeScreen)
+const getProductImageSource = (product) => {
+  if (!product) return null;
+  
+  console.log('Product data:', product);
+  console.log('imageRequire:', product.imageRequire);
+  console.log('imageUri:', product.imageUri);
+  
+  // Priority: imageRequire > imageUri (from localImageMap) > imageUri (http) > null
+  if (product.imageRequire) {
+    console.log('Using imageRequire');
+    return product.imageRequire;
+  }
+  
+  if (product.imageUri) {
+    // Check if it's in our local map
+    if (localImageMap[product.imageUri]) {
+      console.log('Using localImageMap for:', product.imageUri);
+      return localImageMap[product.imageUri];
+    }
+    // Check if it's a remote URL
+    if (/^https?:/i.test(product.imageUri)) {
+      console.log('Using remote URL:', product.imageUri);
+      return { uri: product.imageUri };
+    }
+  }
+  
+  // No valid image source
+  console.log('No valid image source found');
+  return null;
+};
 
 const generateProductImages = (product) => {
-  // Generate multiple images for slider (using emoji variations or multiple views)
-  const baseEmoji = product.image || '🧪';
+  // Get the actual image source
+  const imageSource = getProductImageSource(product);
+  
+  console.log('Generated image source:', imageSource);
+  
+  // Generate multiple copies for slider
+  if (imageSource) {
+    return [
+      { id: 1, source: imageSource },
+      { id: 2, source: imageSource },
+      { id: 3, source: imageSource },
+      { id: 4, source: imageSource },
+    ];
+  }
+  
+  // Fallback to emoji if no image
+  const baseEmoji = product.image || '📦';
   return [
     { id: 1, emoji: baseEmoji },
     { id: 2, emoji: baseEmoji },
@@ -43,6 +130,7 @@ const generateProductImages = (product) => {
 };
 
 export default function ProductDetailScreen({ route, navigation }) {
+  const insets = useSafeAreaInsets();
   const { product } = route.params || {};
   const { addToCart, increment, decrement, items: cartItems } = useCart();
   const { addOrder } = useOrders();
@@ -60,12 +148,21 @@ export default function ProductDetailScreen({ route, navigation }) {
       const updatedStock = getStockStatus(product.id);
       setStock(updatedStock);
     }
-  }, [product?.id]);
+  }, [product?.id, getStockStatus]);
 
   if (!product) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Product not found</Text>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Product Details</Text>
+          <View style={{ width: 44 }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, color: '#666' }}>Product not found</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -92,9 +189,47 @@ export default function ProductDetailScreen({ route, navigation }) {
     Alert.alert('Success', 'Product added to cart!');
   };
 
-  const handleBuyNow = () => {
+  const checkUserAddress = async () => {
+    try {
+      const user = auth().currentUser;
+      if (!user) {
+        return false;
+      }
+      const doc = await firestore().collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        const data = doc.data() || {};
+        // Check if all address fields are present and not empty
+        if (data.name && data.state && data.city && data.address) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.log('Address check error:', error);
+      return false;
+    }
+  };
+
+  const handleBuyNow = async () => {
     if (currentStockStatus.count === 0) {
       Alert.alert('Out of Stock', 'This product is currently out of stock.');
+      return;
+    }
+    
+    // Check if user has saved address
+    const hasAddress = await checkUserAddress();
+    if (!hasAddress) {
+      Alert.alert(
+        'Address Required',
+        'Please save your full address before placing an order.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Go to Profile',
+            onPress: () => navigation.navigate('MyProfile'),
+          },
+        ]
+      );
       return;
     }
     
@@ -168,7 +303,16 @@ export default function ProductDetailScreen({ route, navigation }) {
             {images.map((img) => (
               <View key={img.id} style={styles.imageSlide}>
                 <View style={styles.productImageContainer}>
-                  <Text style={styles.productEmoji}>{img.emoji}</Text>
+                  {img.source ? (
+                    <Image 
+                      source={img.source} 
+                      style={styles.detailImageTag}
+                      resizeMode="contain"
+                      onError={(error) => console.log('Image load error:', error.nativeEvent.error)}
+                    />
+                  ) : (
+                    <Text style={styles.productEmoji}>{img.emoji}</Text>
+                  )}
                 </View>
               </View>
             ))}
@@ -240,7 +384,10 @@ export default function ProductDetailScreen({ route, navigation }) {
       </ScrollView>
       
       {/* Sticky Bottom Buttons */}
-      <View style={styles.bottomActionContainer}>
+      <View style={[
+        styles.bottomActionContainer,
+        { paddingBottom: 12 + (insets?.bottom || 0) }
+      ]}>
         {/* Left Side: Add to Cart or Quantity Controls */}
         {isInCart && cartQuantity > 0 ? (
           <View style={styles.qtyControlContainer}>
@@ -323,7 +470,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   content: {
-    paddingBottom: 100,
+    paddingBottom: 160,
   },
   imageSliderContainer: {
     position: 'relative',
@@ -347,6 +494,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  detailImageTag: {
+    width: '100%',
+    height: '100%',
   },
   productEmoji: {
     fontSize: 120,
@@ -569,4 +720,3 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
-

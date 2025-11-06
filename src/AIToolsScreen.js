@@ -19,130 +19,274 @@ import {
   BackHandler,
   AppState,
   Dimensions,
+  ScrollView,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Voice from '@react-native-voice/voice';
+import * as Location from 'expo-location';
+import { useLanguage } from './LanguageContext';
+import { generateGeminiReply, setGeminiApiKey } from './services/gemini';
 
 export default function AIToolsScreen() {
   const navigation = useNavigation();
+  const { getVoiceLocale } = useLanguage();
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showAccuracyModal, setShowAccuracyModal] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [locationName, setLocationName] = useState('Set your location');
-  const [manualState, setManualState] = useState('');
-  const [manualCity, setManualCity] = useState('');
-  const [showManualModal, setShowManualModal] = useState(false);
   const [hasAskedLocation, setHasAskedLocation] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const [showMoreExpanded, setShowMoreExpanded] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const tabBarHeight = typeof useBottomTabBarHeight === 'function' ? useBottomTabBarHeight() : 56;
+  const TAB_BAR_OFFSET = tabBarHeight; // height of the app's bottom tab bar
   const drawerWidth = Math.round((typeof Dimensions !== 'undefined' ? Dimensions.get('window').width : 360) * 0.75);
   const drawerTranslateX = React.useRef(new Animated.Value(-drawerWidth)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [profileName, setProfileName] = useState('Farmer');
   const [isListening, setIsListening] = useState(false);
-  const [voiceLocale, setVoiceLocale] = useState('en-US');
-  const [showVoiceLangModal, setShowVoiceLangModal] = useState(false);
   const micPulse = React.useRef(new Animated.Value(1)).current;
   const micLoopRef = React.useRef(null);
 
-  const supportedVoiceLocales = [
-    { code: 'en-US', label: 'English' },
-    { code: 'hi-IN', label: 'Hindi' },
-    { code: 'bn-IN', label: 'Bengali' },
-    { code: 'gu-IN', label: 'Gujarati' },
-    { code: 'kn-IN', label: 'Kannada' },
-    { code: 'mr-IN', label: 'Marathi' },
-    { code: 'pa-IN', label: 'Punjabi' },
-    { code: 'ta-IN', label: 'Tamil' },
-    { code: 'te-IN', label: 'Telugu' },
-  ];
-
-  const requestAndSetLocation = async () => {
+  // Chat modal state
+  const [chatVisible, setChatVisible] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    { role: 'model', text: 'Hi! Ask me anything related to crops, pests, weather, or inputs.' },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatScrollRef = React.useRef(null);
+  const searchInputRef = React.useRef(null);
+  // Enable smooth layout transitions for expanding/collapsing "More" (Android requires this)
+  useEffect(() => {
     try {
-      // Single-implementation using React Native Geolocation + Android runtime permission
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          setLocationEnabled(false);
-          setLocationName('Location permission not enabled');
-          return;
-        }
+      if (Platform.OS === 'android' && UIManager && typeof UIManager.setLayoutAnimationEnabledExperimental === 'function') {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
       }
+    } catch (_) {}
+  }, []);
 
-      if (!navigator.geolocation) {
+  // Configure Gemini API key (prefers EXPO_PUBLIC_GEMINI_API_KEY; falls back to provided key)
+  useEffect(() => {
+    try {
+      const hasEnvKey = !!(typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_GEMINI_API_KEY);
+      if (!hasEnvKey) {
+        setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
+      }
+    } catch (_) {}
+  }, []);
+
+  // Auto-scroll to latest message when new messages arrive or chat opens
+  useEffect(() => {
+    if (!chatVisible) return;
+    const t = setTimeout(() => {
+      try { chatScrollRef.current?.scrollToEnd({ animated: true }); } catch (_) {}
+    }, 50);
+    return () => clearTimeout(t);
+  }, [chatVisible, chatMessages, chatLoading]);
+
+  const isRequestingLocationRef = React.useRef(false);
+  const requestAndSetLocation = async () => {
+    if (isRequestingLocationRef.current) return;
+    isRequestingLocationRef.current = true;
+    try {
+      // Check existing permission first to avoid duplicate prompts
+      let perm = await Location.getForegroundPermissionsAsync();
+      if (!perm || perm.status !== 'granted') {
+        perm = await Location.requestForegroundPermissionsAsync();
+      }
+      if (!perm || perm.status !== 'granted') {
         setLocationEnabled(false);
-        setLocationName('Geolocation not available');
+        setLocationName('Location permission not enabled');
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords || {};
-          if (latitude == null || longitude == null) {
-            setLocationName('Unable to fetch location');
-            setLocationEnabled(false);
-            return;
+      // Get current position with a retry to avoid transient errors right after grant
+      let position = null;
+      try {
+        position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+          timeout: 15000,
+          maximumAge: 5000,
+        });
+      } catch (firstErr) {
+        await new Promise(r => setTimeout(r, 800));
+        position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeout: 15000,
+          maximumAge: 5000,
+        });
+      }
+
+      const { latitude, longitude } = position.coords || {};
+      
+      if (latitude == null || longitude == null) {
+        setLocationName('Unable to fetch location');
+        setLocationEnabled(false);
+        return;
+      }
+
+      // Try to get readable address using expo-location's built-in reverse geocoding
+      let locationText = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+      
+      try {
+        // First try expo-location's reverse geocoding (built-in and reliable)
+        const geocodeResult = await Location.reverseGeocodeAsync({ latitude, longitude });
+        
+          if (geocodeResult && geocodeResult.length > 0) {
+          const addr = geocodeResult[0];
+          // Build readable address - prioritize city/state for India
+          const addressParts = [];
+          
+          // For Indian addresses, prioritize city/town/village
+          if (addr.city) {
+            addressParts.push(addr.city);
+          } else if (addr.subregion && !addr.subregion.includes('District')) {
+            addressParts.push(addr.subregion);
+          } else if (addr.district) {
+            addressParts.push(addr.district);
           }
-          let locationText = `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
-          try {
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            );
+          
+          // Add state/region
+          if (addr.region) {
+            addressParts.push(addr.region);
+          } else if (addr.state) {
+            addressParts.push(addr.state);
+          }
+          
+          // If we got a good address, use it; otherwise try formattedAddress
+          if (addressParts.length > 0) {
+            locationText = addressParts.join(', ');
+          } else if (addr.formattedAddress) {
+            // Parse formattedAddress to extract city and state
+            const formatted = addr.formattedAddress;
+            // Try to extract city and state from formatted address
+            const parts = formatted.split(', ').filter(p => p.trim());
+            if (parts.length >= 2) {
+              // Usually format is: Street, City, State, Country
+              // For India, we want: City, State
+              locationText = parts.slice(-3, -1).join(', '); // Get last 2 parts before country
+            } else {
+              locationText = formatted;
+            }
+          }
+        }
+      } catch (expoGeoErr) {
+        console.log('Expo geocoding error:', expoGeoErr);
+        
+        // Fallback to Nominatim OpenStreetMap API
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            {
+              headers: {
+                'User-Agent': 'KisanOne-App/1.0' // Required by Nominatim
+              }
+            }
+          );
+          
+          if (response.ok) {
             const data = await response.json();
             const address = data.address || {};
-            const city = address.city || address.town || address.village || '';
-            const state = address.state || '';
-            const maybe = [city, state].filter(Boolean).join(', ');
-            if (maybe) locationText = maybe;
-          } catch (rgErr) {
-            // keep lat/long fallback
+            
+            // Build address from multiple possible fields (for Indian addresses)
+            const addressParts = [];
+            
+            // City/Town/Village - prioritize this for readability
+            const city = address.city || address.town || address.village || address.suburb || address.locality || '';
+            if (city) {
+              addressParts.push(city);
+            }
+            
+            // District (only if different from city and meaningful)
+            const district = address.district || address.county || '';
+            if (district && district !== city && !district.toLowerCase().includes(city.toLowerCase())) {
+              // Only add district if it's different from city
+              addressParts.push(district);
+            }
+            
+            // State - always add if available
+            const state = address.state || address.region || address.state_district || '';
+            if (state) {
+              addressParts.push(state);
+            }
+            
+            // Build final location text
+            if (addressParts.length > 0) {
+              // Format: "City, State" or "City, District, State"
+              locationText = addressParts.join(', ');
+            } else if (data.display_name) {
+              // Parse display_name as fallback
+              // Format is usually: "Street, Village/Town/City, District, State, Country"
+              const parts = data.display_name.split(', ').filter(p => p.trim());
+              
+              if (parts.length >= 2) {
+                // For Indian addresses: "..., City, District, State, India"
+                // We want: "City, State"
+                
+                // Remove country if it's at the end
+                const withoutCountry = parts[parts.length - 1].toLowerCase().includes('india') 
+                  ? parts.slice(0, -1) 
+                  : parts;
+                
+                // Get last 2 parts (usually City, State) or (District, State)
+                if (withoutCountry.length >= 2) {
+                  locationText = withoutCountry.slice(-2).join(', ');
+                } else {
+                  locationText = withoutCountry.join(', ');
+                }
+              } else {
+                locationText = data.display_name;
+              }
+            }
           }
-          setLocationName(locationText);
-          setLocationEnabled(true);
-          setShowLocationModal(false);
-          setShowAccuracyModal(false);
-        },
-        (error) => {
-          console.log('Location error:', error);
-          setLocationName('Unable to fetch location');
-          setLocationEnabled(false);
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
-      );
+        } catch (nominatimErr) {
+          console.log('Nominatim geocoding error:', nominatimErr);
+          // Keep lat/long as fallback
+        }
+      }
+      
+      setLocationName(locationText);
+      setLocationEnabled(true);
+      setShowLocationModal(false);
+      setShowAccuracyModal(false);
     } catch (e) {
       console.log('Location exception:', e);
-      setLocationName('Unable to fetch location');
+      // Fail silently to avoid error-after-grant UX; leave previous name if any
+      if (!locationEnabled) {
+        setLocationName('Unable to fetch location');
+      }
       setLocationEnabled(false);
+    } finally {
+      isRequestingLocationRef.current = false;
     }
   };
 
   const checkLocationPermission = async () => {
     try {
-      if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.check(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-        );
-        if (!granted && !hasAskedLocation) {
-          setShowLocationModal(true);
-          setHasAskedLocation(true);
-        } else if (granted && !locationEnabled) {
-          await requestAndSetLocation();
-        }
-      } else {
-        // For iOS, show modal on first visit
-        if (!hasAskedLocation) {
-          setShowLocationModal(true);
-          setHasAskedLocation(true);
-        }
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        await requestAndSetLocation();
+      } else if (status === 'undetermined' && !hasAskedLocation) {
+        // Permission not asked yet - show modal to ask
+        setShowLocationModal(true);
+        setHasAskedLocation(true);
+      } else if (status === 'denied') {
+        // Permission denied - show option to open settings
+        setLocationEnabled(false);
+        setLocationName('Location permission denied');
       }
     } catch (e) {
       console.log('Permission check error:', e);
@@ -153,10 +297,9 @@ export default function AIToolsScreen() {
     setShowLocationModal(true);
   };
 
-  const handleEnableLocation = () => {
+  const handleEnableLocation = async () => {
     setShowLocationModal(false);
-    // Start permission flow directly; accuracy modal not required with expo-location
-    requestAndSetLocation();
+    await requestAndSetLocation();
   };
 
   const handleSkipLocation = () => {
@@ -172,46 +315,83 @@ export default function AIToolsScreen() {
     setShowAccuracyModal(false);
   };
 
-  const openManualLocationSelector = () => {
-    setShowLocationModal(false);
-    setShowAccuracyModal(false);
-    setManualCity('');
-    setManualState('');
-    setShowManualModal(true);
-  };
-
-  const saveManualLocation = () => {
-    const state = (manualState || '').trim();
-    const city = (manualCity || '').trim();
-    if (!state && !city) {
-      Alert.alert('Location required', 'Please enter state or city.');
-      return;
-    }
-    const formatted = [city, state].filter(Boolean).join(', ');
-    setLocationName(formatted);
-    setLocationEnabled(true);
-    setShowManualModal(false);
-  };
-
   const openLocationSettings = () => {
+    // Always request GPS location - manual selection removed
     if (locationEnabled) {
-      openManualLocationSelector();
+      // If already enabled, refresh location
+      requestAndSetLocation();
     } else {
+      // If not enabled, show permission modal
       openPermissionFlow();
     }
   };
 
   const handleToolPress = (toolName) => {
+    if (toolName === 'Crop Advisory') {
+      navigation.navigate('CropAdvisory');
+      return;
+    }
     if (toolName === 'Crop Doctor') {
       navigation.navigate('CropDoctor');
+      return;
+    }
+    if (toolName === 'Crop Recommendation') {
+      navigation.navigate('CropRecommendation');
       return;
     }
     Alert.alert('Tool Selected', `You selected ${toolName}`);
   };
 
-  const handleSearch = () => {
-    if (!searchQuery.trim() && !selectedImageUri) return;
-    Alert.alert('Search', `Query: ${searchQuery || '(no text)'}\nImage: ${selectedImageUri ? 'attached' : 'none'}`);
+  const handleSearch = (textOverride) => {
+    // Open chat when pressing send on the fixed bar
+    setChatVisible(true);
+    const candidate = (typeof textOverride === 'string') ? textOverride : (typeof searchQuery === 'string' ? searchQuery : '');
+    const queryToSend = String(candidate || '').trim();
+    if (queryToSend) {
+      // seed the chat with current query
+      setTimeout(() => {
+        setChatInput(queryToSend);
+        setSearchQuery('');
+        handleSendMessage(queryToSend);
+      }, 0);
+    }
+  };
+
+  const handleQuickAsk = (labelText) => {
+    // Show the label briefly in the input, open chat, then auto-send
+    try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+    setShowMoreExpanded(false);
+    setSearchQuery(labelText);
+    handleSearch(labelText);
+  };
+
+  const openChatOnFocus = () => {
+    // Close expanded More options with a smooth transition when focusing the search bar
+    if (showMoreExpanded) {
+      try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+      setShowMoreExpanded(false);
+    }
+    if (!chatVisible) {
+      setChatVisible(true);
+    }
+  };
+
+  const handleSendMessage = async (textOverride) => {
+    const messageText = (textOverride ?? chatInput).trim();
+    if (!messageText) return;
+    const nextMessages = [...chatMessages, { role: 'user', text: messageText }];
+    setChatMessages(nextMessages);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const reply = await generateGeminiReply(nextMessages);
+      setChatMessages((prev) => [...prev, { role: 'model', text: reply }]);
+    } catch (e) {
+      setChatMessages((prev) => [...prev, { role: 'model', text: 'Sorry, I had an issue contacting Gemini. Please add your API key and try again.' }]);
+      console.log('Gemini error:', e);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const openImageOptions = () => {
@@ -268,10 +448,34 @@ export default function AIToolsScreen() {
 
   const isFocused = useIsFocused();
 
-  // Avoid auto-prompt loops; user initiates location from the icon
+  // Check location permission when screen is focused
   useEffect(() => {
-    // no-op
+    if (isFocused) {
+      // Check and request location permission when user enters AI Tools screen
+      checkLocationPermission();
+    }
   }, [isFocused]);
+
+  // When leaving this tab/screen, hide overlays so they don't overlap other tabs
+  useEffect(() => {
+    if (!isFocused) {
+      try { Keyboard.dismiss(); } catch (_) {}
+      setChatVisible(false);
+      setShowMoreExpanded(false);
+    }
+  }, [isFocused]);
+
+  // If user toggles permission in OS settings, refresh on app foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkLocationPermission();
+      }
+    });
+    return () => {
+      try { sub.remove(); } catch (_) {}
+    };
+  }, []);
 
   // Listen to keyboard to adjust layout
   useEffect(() => {
@@ -282,6 +486,15 @@ export default function AIToolsScreen() {
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
       setIsKeyboardVisible(false);
       setKeyboardHeight(0);
+      // Hide AI chat only if the search input is not focused to avoid focus loops
+      try {
+        const stillFocused = !!(searchInputRef.current && typeof searchInputRef.current.isFocused === 'function' && searchInputRef.current.isFocused());
+        if (!stillFocused) {
+          setChatVisible(false);
+        }
+      } catch (_) {
+        setChatVisible(false);
+      }
     });
     return () => {
       showSub.remove();
@@ -315,6 +528,10 @@ export default function AIToolsScreen() {
   }, []);
 
   const openDrawer = () => {
+    // Hide interactive overlays so drawer doesn't overlap them
+    try { Keyboard.dismiss(); } catch (_) {}
+    setChatVisible(false);
+    setShowMoreExpanded(false);
     setIsDrawerOpen(true);
     Animated.parallel([
       Animated.timing(drawerTranslateX, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -322,37 +539,192 @@ export default function AIToolsScreen() {
     ]).start();
   };
 
+  // Check if Voice module is available
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
+
   // Voice recognition handlers for search bar
   useEffect(() => {
-    Voice.onSpeechStart = () => setIsListening(true);
-    Voice.onSpeechEnd = () => setIsListening(false);
-    Voice.onSpeechError = () => setIsListening(false);
-    Voice.onSpeechResults = (e) => {
-      const text = (e && e.value && e.value[0]) ? e.value[0] : '';
-      if (text) setSearchQuery(text);
+    // Check if Voice module is available
+    if (!Voice) {
+      console.warn('Voice module is not available. App needs to be rebuilt.');
+      setVoiceAvailable(false);
+      return;
+    }
+
+    // Initialize Voice event listeners
+    const setupVoice = async () => {
+      try {
+        // Check if Voice methods are available
+        if (typeof Voice.destroy !== 'function' || typeof Voice.removeAllListeners !== 'function') {
+          console.warn('Voice module methods not available. App needs to be rebuilt.');
+          setVoiceAvailable(false);
+          return;
+        }
+
+        // Clean up any existing instance first
+        try {
+          await Voice.destroy();
+          Voice.removeAllListeners();
+        } catch (err) {
+          // Ignore cleanup errors if module isn't initialized yet
+          console.log('Cleanup (expected on first load):', err);
+        }
+
+        // Set up event listeners only if Voice is available
+        if (Voice && typeof Voice === 'object') {
+          Voice.onSpeechStart = () => {
+            console.log('Voice recognition started');
+            setIsListening(true);
+          };
+          
+          Voice.onSpeechEnd = () => {
+            console.log('Voice recognition ended');
+            setIsListening(false);
+          };
+          
+          Voice.onSpeechError = (e) => {
+            console.error('Voice recognition error:', e);
+            setIsListening(false);
+            Alert.alert(
+              'Voice Error',
+              'Could not process your voice. Please try again.',
+              [{ text: 'OK' }]
+            );
+          };
+          
+          Voice.onSpeechResults = (e) => {
+            console.log('Voice recognition results:', e);
+            const text = (e && e.value && e.value.length > 0) ? e.value[0] : '';
+            if (text) {
+              console.log('Setting search query to:', text);
+              setSearchQuery(text);
+              setIsListening(false);
+            }
+          };
+          
+          Voice.onSpeechPartialResults = (e) => {
+            // Update search bar with partial results while speaking
+            const text = (e && e.value && e.value.length > 0) ? e.value[0] : '';
+            if (text) {
+              setSearchQuery(text);
+            }
+          };
+
+          setVoiceAvailable(true);
+        } else {
+          console.warn('Voice module is null. App needs to be rebuilt.');
+          setVoiceAvailable(false);
+        }
+      } catch (err) {
+        console.error('Error setting up Voice:', err);
+        setVoiceAvailable(false);
+      }
     };
+
+    setupVoice();
+    
     return () => {
-      try { Voice.destroy().then(Voice.removeAllListeners); } catch (_) {}
+      // Cleanup on unmount
+      const cleanup = async () => {
+        try {
+          if (Voice && typeof Voice.destroy === 'function') {
+            await Voice.destroy();
+            if (typeof Voice.removeAllListeners === 'function') {
+              Voice.removeAllListeners();
+            }
+          }
+        } catch (err) {
+          console.error('Error cleaning up voice:', err);
+        }
+      };
+      cleanup();
     };
   }, []);
 
   const startVoiceRecognition = async () => {
     try {
+      // Check if already listening
+      if (isListening) {
+        await stopVoiceRecognition();
+        return;
+      }
+
+      // Simple check - if Voice doesn't exist, show rebuild message
+      if (!Voice || typeof Voice.start !== 'function') {
+        Alert.alert(
+          'Voice Recognition Unavailable',
+          'Voice module is not linked. Please rebuild the app:\n\nnpx expo prebuild --clean\nnpx expo run:android',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Request microphone permission
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission required', 'Microphone permission is needed to use voice input.');
+          Alert.alert(
+            'Permission Required',
+            'Microphone permission is needed.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
+          );
           return;
         }
       }
-      await Voice.start(voiceLocale);
-    } catch (_) {}
+
+      // Get voice locale from language context and start
+      const currentVoiceLocale = getVoiceLocale();
+      await Voice.start(currentVoiceLocale);
+      console.log('Voice started with locale:', currentVoiceLocale);
+    } catch (error) {
+      console.error('Voice error:', error);
+      setIsListening(false);
+      if (error.message?.includes('null') || error.message?.includes('startSpeech')) {
+        Alert.alert(
+          'Rebuild Required',
+          'Please rebuild the app: npx expo run:android',
+          [{ text: 'OK' }]
+        );
+      }
+    }
   };
 
   const stopVoiceRecognition = async () => {
-    try { await Voice.stop(); } catch (_) {}
+    try {
+      if (!Voice || Voice === null) {
+        setIsListening(false);
+        return;
+      }
+
+      // Try to stop first
+      try {
+        if (typeof Voice.stop === 'function') {
+          await Voice.stop();
+        }
+      } catch (stopErr) {
+        console.log('Stop error (may already be stopped):', stopErr);
+      }
+      
+      // Then destroy to ensure clean state
+      try {
+        if (typeof Voice.destroy === 'function') {
+          await Voice.destroy();
+        }
+      } catch (destroyErr) {
+        console.log('Destroy error:', destroyErr);
+      }
+      
+      setIsListening(false);
+      console.log('Voice recognition stopped');
+    } catch (error) {
+      console.error('Error stopping voice recognition:', error);
+      setIsListening(false);
+    }
   };
 
   const handleMicPress = () => {
@@ -389,11 +761,23 @@ export default function AIToolsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {(() => {
+        // Calculate responsive max height for chat based on viewport and keyboard
+        const windowHeight = (typeof Dimensions !== 'undefined' ? Dimensions.get('window').height : 720);
+        // Leave at least ~200dp for content below and search bar area
+        const maxByAvailable = Math.max(220, windowHeight - (keyboardHeight + 200));
+        // Also clamp to 55% of screen height
+        var __chatMaxHeight = Math.min(windowHeight * 0.55, maxByAvailable);
+        // Expose on global for inline style usage below
+        // eslint-disable-next-line no-undef
+        global.__chatMaxHeight = __chatMaxHeight;
+        return null;
+      })()}
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
+      <View style={[styles.header, { paddingTop: 12 + (insets?.top || 0) }]}>
+        <TouchableOpacity style={styles.menuButton} onPress={openDrawer} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={styles.menuIcon}>☰</Text>
         </TouchableOpacity>
         
@@ -403,7 +787,7 @@ export default function AIToolsScreen() {
               <Text style={[styles.locationText, locationEnabled ? styles.locationTextEnabled : styles.locationTextDisabled]}>
                 {locationName}
               </Text>
-              <Text style={styles.locationSubText}>{locationEnabled ? 'Tap to change location' : 'Tap to enable'}</Text>
+              <Text style={styles.locationSubText}>{locationEnabled ? 'Tap to refresh location' : 'Tap to enable location'}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -411,6 +795,7 @@ export default function AIToolsScreen() {
         <TouchableOpacity 
           style={styles.locationIconContainer}
           onPress={requestAndSetLocation}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="location-outline" size={24} color="#666666" />
         </TouchableOpacity>
@@ -426,52 +811,157 @@ export default function AIToolsScreen() {
 
         {/* Tool Cards */}
         <View style={styles.toolsContainer}>
-          {/* First Row: Crop Advisory and Crop Recommendation side by side */}
+          {/* First Row: Crop Advisory and Crop Doctor */}
           <View style={styles.toolsRow}>
             <TouchableOpacity 
-              style={[
-                styles.toolCard,
-                isKeyboardVisible ? styles.toolCardHalfSmall : styles.toolCardHalf,
-                styles.cropAdvisoryCard,
-              ]}
+              style={styles.toolCardPill}
               onPress={() => handleToolPress('Crop Advisory')}
             >
-              <Text style={[styles.toolEmoji, isKeyboardVisible && styles.toolEmojiSmall]}></Text>
-              <Text style={styles.toolName} numberOfLines={1} ellipsizeMode="clip">Crop Advisory</Text>
+              <Image 
+                source={require('../assets/AdvisorOverGreen.png')} 
+                style={styles.toolIconPill}
+                resizeMode="contain"
+              />
+              <Text style={styles.toolNamePill} numberOfLines={1}>Crop Advisory</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[
-                styles.toolCard,
-                isKeyboardVisible ? styles.toolCardHalfSmall : styles.toolCardHalf,
-                styles.cropRecommendationCard,
-              ]}
-              onPress={() => handleToolPress('Crop Recommendation')}
-            >
-              <Text style={[styles.toolEmoji, isKeyboardVisible && styles.toolEmojiSmall]}></Text>
-              <Text style={styles.toolName} numberOfLines={1} ellipsizeMode="clip">Crop Doctorr</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Second Row: Crop Doctor centered below */}
-          <View style={[styles.centerRow, isKeyboardVisible && styles.centerRowSmall]}>
-            <TouchableOpacity 
-              style={[
-                styles.toolCard,
-                isKeyboardVisible ? styles.toolCardCenterSmall : styles.toolCardCenter,
-                styles.cropDoctorCard,
-              ]}
+              style={styles.toolCardPill}
               onPress={() => handleToolPress('Crop Doctor')}
             >
-              <Text style={[styles.toolEmoji, isKeyboardVisible && styles.toolEmojiSmall]}></Text>
-              <Text style={styles.toolName} numberOfLines={1} ellipsizeMode="clip">Crop Recommendation</Text>
+              <Image 
+                source={require('../assets/doctorOverGreen.png')} 
+                style={styles.toolIconPill}
+                resizeMode="contain"
+              />
+              <Text style={styles.toolNamePill} numberOfLines={1}>Crop Doctor</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Second Row: Crop Recommendation and More */}
+          <View style={styles.toolsRow}>
+            <TouchableOpacity 
+              style={styles.toolCardPill}
+              onPress={() => handleToolPress('Crop Recommendation')}
+            >
+              <Image 
+                source={require('../assets/recommendationOverGreen.png')} 
+                style={styles.toolIconPill}
+                resizeMode="contain"
+              />
+              <Text style={styles.toolNamePill} numberOfLines={1}>Crop Recommendation</Text>
+            </TouchableOpacity>
+
+            {!showMoreExpanded && (
+              <TouchableOpacity 
+                style={styles.toolCardPill}
+                onPress={() => {
+                  try { Keyboard.dismiss(); } catch (_) {}
+                  try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
+                  setShowMoreExpanded(true);
+                }}
+              >
+                <Text style={styles.toolNamePill} numberOfLines={1}>More</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Expanded More Options - 4 rows x 2 columns */}
+          {showMoreExpanded && (
+            <View style={styles.expandedMoreContainer}>
+              {/* Row 1 */}
+              <View style={styles.toolsRow}>
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Weather Forecast')}
+                >
+                  <Ionicons name="partly-sunny-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Weather Forecast</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Soil Testing')}
+                >
+                  <Ionicons name="flask-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Soil Testing</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Row 2 */}
+              <View style={styles.toolsRow}>
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Market Prices')}
+                >
+                  <Ionicons name="trending-up-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Market Prices</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Crop Calendar')}
+                >
+                  <Ionicons name="calendar-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Crop Calendar</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Row 3 */}
+              <View style={styles.toolsRow}>
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Fertilizer Calculator')}
+                >
+                  <Ionicons name="calculator-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Fertilizer Calculator</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Irrigation Guide')}
+                >
+                  <Ionicons name="water-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Irrigation Guide</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Row 4 */}
+              <View style={styles.toolsRow}>
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Pest Management')}
+                >
+                  <Ionicons name="bug-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Pest Management</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.toolCardPill}
+                  onPress={() => handleQuickAsk('Expert Consultation')}
+                >
+                  <Ionicons name="people-outline" size={24} color="#374151" style={{ marginRight: 12 }} />
+                  <Text style={styles.toolNamePill} numberOfLines={1} ellipsizeMode="tail">Expert Consultation</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </View>
 
-      {/* Fixed Search Bar Container */}
-      <View style={[styles.fixedSearchContainer, { bottom: keyboardHeight + 10 }]}>
+      {/* Fixed Search Bar Container (only when focused and drawer closed) */}
+      {isFocused && (
+      <View 
+        style={[
+          styles.fixedSearchContainer,
+          {
+            bottom: Math.max(0, ((isKeyboardVisible ? keyboardHeight : TAB_BAR_OFFSET) + (insets?.bottom || 0) - 8)),
+            paddingBottom: 0,
+            zIndex: isDrawerOpen ? 0 : 20,
+          }
+        ]}
+        pointerEvents={isDrawerOpen ? 'none' : 'auto'}
+      >
         <View style={styles.searchContainer}>
           <TouchableOpacity style={styles.iconButton} onPress={openImageOptions}>
             <Ionicons name="image-outline" size={24} color="#47afcfff" />
@@ -487,12 +977,14 @@ export default function AIToolsScreen() {
           ) : null}
 
           <TextInput
+            ref={searchInputRef}
             style={styles.searchInput}
             placeholder="Ask anything ..."
             placeholderTextColor="#999999"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
+            onFocus={openChatOnFocus}
+            onSubmitEditing={() => handleSearch()}
           />
 
           {(searchQuery.trim() || selectedImageUri) ? (
@@ -500,19 +992,23 @@ export default function AIToolsScreen() {
               <Ionicons name="arrow-up" size={20} color="#47afcfff" />
             </TouchableOpacity>
           ) : (
-            <>
-            <TouchableOpacity style={[styles.langButton]} onPress={() => setShowVoiceLangModal(true)}>
-              <Text style={styles.langButtonText}>{(voiceLocale.split('-')[0] || 'EN').toUpperCase()}</Text>
-            </TouchableOpacity>
             <Animated.View style={{ transform: [{ scale: micPulse }] }}>
-              <TouchableOpacity style={[styles.iconButton, isListening && { backgroundColor: '#F1F5F9', borderRadius: 18 }]} onPress={handleMicPress}>
+              <TouchableOpacity 
+                style={[
+                  styles.iconButton, 
+                  isListening && { backgroundColor: '#F1F5F9', borderRadius: 18 },
+                  !voiceAvailable && { opacity: 0.5 }
+                ]} 
+                onPress={handleMicPress}
+                disabled={!voiceAvailable}
+              >
                 <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={24} color="#47afcfff" />
               </TouchableOpacity>
             </Animated.View>
-            </>
           )}
         </View>
       </View>
+      )}
 
       {/* Location Permission Modal - Step 1 */}
       <Modal
@@ -557,30 +1053,6 @@ export default function AIToolsScreen() {
         </View>
       </Modal>
 
-      {/* Voice Language Picker */}
-      <Modal
-        visible={showVoiceLangModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowVoiceLangModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select voice language</Text>
-            <View style={{ width: '100%' }}>
-              {supportedVoiceLocales.map((item) => (
-                <TouchableOpacity key={item.code} style={[styles.drawerItem, { borderBottomWidth: 0 }]} onPress={() => { setVoiceLocale(item.code); setShowVoiceLangModal(false); }}>
-                  <Text style={[styles.drawerItemText, { flex: 1 }]}>{item.label}</Text>
-                  {voiceLocale === item.code && <Ionicons name="checkmark" size={18} color="#2E7D32" />}
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={[styles.skipButton, { marginTop: 8 }]} onPress={() => setShowVoiceLangModal(false)}>
-              <Text style={styles.skipButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Location Accuracy Modal - Step 2 */}
       <Modal
@@ -606,37 +1078,6 @@ export default function AIToolsScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, styles.enableButton]} onPress={handleTurnOnAccuracy}>
                 <Text style={styles.enableButtonText}>Turn on</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Manual Location Selector */}
-      <Modal
-        visible={showManualModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowManualModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select location manually</Text>
-            <Text style={styles.modalMessage}>Enter your State and City to personalize AI tools</Text>
-            <View style={{ width: '100%', gap: 10 }}>
-              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12 }}>
-                <TextInput placeholder="State" placeholderTextColor="#999999" value={manualState} onChangeText={setManualState} style={{ height: 44, color: '#333333' }} />
-              </View>
-              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 10, paddingHorizontal: 12 }}>
-                <TextInput placeholder="City" placeholderTextColor="#999999" value={manualCity} onChangeText={setManualCity} style={{ height: 44, color: '#333333' }} />
-              </View>
-            </View>
-            <View style={[styles.modalButtons, { marginTop: 16 }]}>
-              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setShowManualModal(false)}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.enableButton]} onPress={saveManualLocation}>
-                <Text style={styles.enableButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -707,6 +1148,42 @@ export default function AIToolsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Inline Chat Box (non-fullscreen) */}
+      {isFocused && chatVisible && !isDrawerOpen && (
+        <View style={[
+          styles.chatSheet,
+          // Keep the chat box above the search bar with a comfy margin
+          { bottom: keyboardHeight + 110 + (insets?.bottom || 0), maxHeight: (global && global.__chatMaxHeight) ? global.__chatMaxHeight : undefined },
+        ]}>
+          <View style={styles.chatHeader}>
+            <Text style={styles.chatTitle}>AI Assistant</Text>
+            <TouchableOpacity onPress={() => setChatVisible(false)} style={styles.chatCloseBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={18} color="#111827" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            ref={chatScrollRef}
+            style={styles.chatMessages}
+            contentContainerStyle={{ padding: 12 }}
+            showsVerticalScrollIndicator={true}
+            onContentSizeChange={() => { try { chatScrollRef.current?.scrollToEnd({ animated: true }); } catch (_) {} }}
+          >
+            {chatMessages.map((m, idx) => (
+              <View key={idx} style={[styles.bubble, m.role === 'user' ? styles.userBubble : styles.modelBubble]}>
+                <Text style={[styles.bubbleText, m.role === 'user' ? styles.userText : styles.modelText]}>{m.text}</Text>
+              </View>
+            ))}
+            {chatLoading ? (
+              <View style={[styles.bubble, styles.modelBubble]}>
+                <Text style={[styles.bubbleText, styles.modelText]}>Thinking...</Text>
+              </View>
+            ) : null}
+          </ScrollView>
+        </View>
+      )}
+
     </SafeAreaView>
   );
 }
@@ -721,7 +1198,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 40,
     paddingBottom: 12,
     backgroundColor: '#FFFFFF',
   },
@@ -790,77 +1266,50 @@ const styles = StyleSheet.create({
   toolsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 12,
     width: '100%',
   },
-  centerRow: {
-    width: '70%',
-    alignSelf: 'center',
-  },
-  centerRowSmall: {
-    width: '70%',
-  },
-  toolCard: {
-    borderRadius: 16,
-    padding: 24,
+  toolCardPill: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    minHeight: 56,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
+    flex: 1,
+    marginHorizontal: 6,
+    minWidth: 0,
   },
-  toolCardHalf: {
-    width: '48%',
-    padding: 20,
+  toolIconPill: {
+    width: 32,
+    height: 32,
+    marginRight: 12,
+    flexShrink: 0,
   },
-  toolCardHalfSmall: {
-    width: '48%',
-    padding: 14,
-  },
-  toolCardCenter: {
-    width: '100%',
-    padding: 20,
-  },
-  toolCardCenterSmall: {
-    width: '100%',
-    padding: 14,
-  },
-  cropAdvisoryCard: {
-    backgroundColor: '#F8F9FA',
-    borderColor: '#E8F5E8',
-  },
-  cropRecommendationCard: {
-    backgroundColor: '#FFF8E1',
-    borderColor: '#FFE0B2',
-  },
-  cropDoctorCard: {
-    backgroundColor: '#FCE4EC',
-    borderColor: '#F8BBD9',
-  },
-  toolEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  toolEmojiSmall: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  toolName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333333',
+  toolNamePill: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#374151',
+    flexShrink: 1,
+    minWidth: 0,
     textAlign: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffffff',
-    borderRadius: 28,
+    borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 1,
     width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -875,9 +1324,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 0,
+    paddingTop: 0,
     backgroundColor: '#FFFFFF',
   },
   drawerOverlay: {
@@ -887,6 +1336,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
+    zIndex: 1000,
   },
   drawer: {
     height: '100%',
@@ -1116,5 +1566,109 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 14,
     fontWeight: '500',
+  },
+  expandedMoreContainer: {
+    marginTop: 12,
+    width: '100%',
+  },
+  // Chat styles (inline sheet)
+  chatSheet: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    maxHeight: '60%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    overflow: 'hidden',
+    paddingTop: 44,
+    zIndex: 30,
+  },
+  chatHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  chatTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  chatCloseBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 6,
+  },
+  chatMessages: {
+    flex: 1,
+  },
+  bubble: {
+    maxWidth: '85%',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  userBubble: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#DCFCE7',
+  },
+  modelBubble: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F3F4F6',
+  },
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  userText: {
+    color: '#065F46',
+  },
+  modelText: {
+    color: '#111827',
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#111827',
+    marginRight: 8,
+  },
+  chatSend: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2E7D32',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

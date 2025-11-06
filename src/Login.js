@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { 
     View, 
     Text, 
@@ -10,11 +10,21 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
-    Image
+    Image,
+    Dimensions
 } from "react-native";
 import auth from "@react-native-firebase/auth";
 import firestore from "@react-native-firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Get device dimensions
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Responsive scaling functions
+const scale = (size) => (screenWidth / 375) * size; // Base width is 375 (iPhone 6/7/8)
+const verticalScale = (size) => (screenHeight / 667) * size; // Base height is 667 (iPhone 6/7/8)
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
 export default function Login() {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -23,22 +33,138 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const navigation = useNavigation();
     const otpRefs = useRef([]);
+    const insets = useSafeAreaInsets();
+
+    // Get auth and firestore instances once using useMemo to avoid deprecation warnings
+    const authInstance = useMemo(() => auth(), []);
+    const firestoreInstance = useMemo(() => firestore(), []);
 
     const signInWithPhoneNumber = async () => {
-        if (!phoneNumber.trim()) {
+        // Clean phone number: remove all non-digit characters
+        const cleanedPhone = phoneNumber.trim().replace(/\D/g, '');
+        
+        if (!cleanedPhone) {
             Alert.alert("Error", "Please enter your phone number");
+            return;
+        }
+        
+        // Validate Indian phone number (10 digits, not starting with 0 or 1)
+        if (cleanedPhone.length !== 10) {
+            Alert.alert("Invalid Phone Number", "Please enter a valid 10-digit phone number");
+            return;
+        }
+        
+        if (cleanedPhone[0] === '0' || cleanedPhone[0] === '1') {
+            Alert.alert("Invalid Phone Number", "Phone number cannot start with 0 or 1");
             return;
         }
         
         setLoading(true);
         try {
-            // Format phone number with +91 prefix
-            const formattedPhoneNumber = `+91${phoneNumber}`;
-            const confirmation = await auth().signInWithPhoneNumber(formattedPhoneNumber);
+            // Format phone number in E.164 format: +[country code][subscriber number]
+            // India country code is 91, subscriber number is 10 digits
+            const formattedPhoneNumber = `+91${cleanedPhone}`;
+            
+            // Verify auth instance exists
+            if (!authInstance) {
+                throw new Error('Firebase Auth is not initialized. Please rebuild the app.');
+            }
+            
+            console.log('====================================');
+            console.log('Firebase Auth Debug Info:');
+            console.log('Phone Number:', formattedPhoneNumber);
+            console.log('Auth Instance:', authInstance ? 'Initialized' : 'Not Initialized');
+            console.log('Auth Instance Type:', typeof authInstance);
+            console.log('SignInWithPhoneNumber Method:', typeof authInstance.signInWithPhoneNumber);
+            console.log('====================================');
+            
+            // Use the memoized auth instance
+            console.log('Calling signInWithPhoneNumber...');
+            const confirmation = await authInstance.signInWithPhoneNumber(formattedPhoneNumber);
+            
+            console.log('Confirmation received:', confirmation ? 'Yes' : 'No');
+            console.log('Confirmation object:', confirmation);
+            
+            if (!confirmation) {
+                throw new Error('No confirmation object received from Firebase');
+            }
+            
             setConfirm(confirmation);
+            
+            Alert.alert(
+                "Code Sent", 
+                "Verification code has been sent to your phone number.\n\nPlease check your SMS inbox."
+            );
         } catch (error) {
-            console.log("Error sending code: ", error);
-            Alert.alert("Error", "Failed to send verification code. Please try again.");
+            console.error('====================================');
+            console.error('Firebase Auth Error Details:');
+            console.error('Error Object:', error);
+            console.error('Error Type:', typeof error);
+            console.error('Error Code:', error?.code);
+            console.error('Error Message:', error?.message);
+            console.error('Error Stack:', error?.stack);
+            console.error('Full Error:', JSON.stringify(error, null, 2));
+            console.error('====================================');
+            
+            let errorMessage = "Failed to send verification code. Please try again.";
+            let errorTitle = "Error";
+            let showDetailedInfo = false;
+            
+            // Handle specific Firebase Auth errors
+            if (error?.code) {
+                switch (error.code) {
+                    case 'auth/invalid-phone-number':
+                        errorTitle = "Invalid Phone Number";
+                        errorMessage = "The phone number format is invalid. Please enter a valid 10-digit Indian phone number.";
+                        break;
+                    case 'auth/too-many-requests':
+                        errorTitle = "Too Many Requests";
+                        errorMessage = "Too many verification attempts. Please wait a few minutes before trying again.";
+                        break;
+                    case 'auth/quota-exceeded':
+                        errorTitle = "Quota Exceeded";
+                        errorMessage = "SMS quota exceeded. Please try again later or contact support.";
+                        break;
+                    case 'auth/network-request-failed':
+                        errorTitle = "Network Error";
+                        errorMessage = "Network connection failed. Please check your internet connection and try again.";
+                        break;
+                    case 'auth/operation-not-allowed':
+                        errorTitle = "Operation Not Allowed";
+                        errorMessage = "Phone authentication is not enabled in Firebase Console. Please enable it in Authentication > Sign-in method > Phone.";
+                        showDetailedInfo = true;
+                        break;
+                    case 'auth/captcha-check-failed':
+                        errorTitle = "Verification Failed";
+                        errorMessage = "Captcha verification failed. Please try again.";
+                        break;
+                    default:
+                        errorMessage = `Error: ${error.code || 'Unknown error'}\n${error?.message || 'Please check Firebase configuration.'}`;
+                        showDetailedInfo = true;
+                        break;
+                }
+            } else if (error?.message) {
+                // Check for common setup issues
+                if (error.message.includes('not initialized') || error.message.includes('native module')) {
+                    errorTitle = "Firebase Not Configured";
+                    errorMessage = "Firebase Auth is not properly initialized. Please:\n\n1. Rebuild the app: npx expo run:android\n2. Ensure Firebase plugins are installed\n3. Check google-services.json is correct";
+                } else {
+                    errorMessage = error.message;
+                }
+                showDetailedInfo = true;
+            }
+            
+            // Show detailed error info in console for debugging
+            if (showDetailedInfo) {
+                console.error('Troubleshooting Steps:');
+                console.error('1. Check Firebase Console: https://console.firebase.google.com');
+                console.error('2. Enable Phone Authentication in: Authentication > Sign-in method > Phone');
+                console.error('3. For Android: Add SHA-1 certificate in Project Settings > Your App');
+                console.error('4. Rebuild the app: npx expo run:android');
+                console.error('5. Ensure google-services.json is in android/app/ directory');
+            }
+            
+            Alert.alert(errorTitle, errorMessage);
         } finally {
             setLoading(false);
         }
@@ -56,7 +182,7 @@ export default function Login() {
             const user = userCredential.user;
 
             //check if the user is new or existing
-            const userDocument = await firestore()
+            const userDocument = await firestoreInstance
                 .collection("users")
                 .doc(user.uid)
                 .get();
@@ -84,7 +210,10 @@ export default function Login() {
                 style={styles.keyboardView}
             >
                 {/* Header */}
-                <View style={styles.header}>
+                <View style={[
+                    styles.header,
+                    { paddingTop: Math.max(insets?.top || 0, verticalScale(16)) + verticalScale(14) }
+                ]}>
                     <View style={styles.logoContainer}>
                         <View style={styles.logoPlaceholder}>
                             <Image
@@ -123,9 +252,19 @@ export default function Login() {
                                     <TextInput
                                         style={styles.phoneInput}
                                         value={phoneNumber}
-                                        onChangeText={setPhoneNumber}
+                                        onChangeText={(text) => {
+                                            // Only allow digits and limit to 10 digits
+                                            const digits = text.replace(/\D/g, '').slice(0, 10);
+                                            setPhoneNumber(digits);
+                                        }}
                                         keyboardType="phone-pad"
                                         autoFocus
+                                        placeholder="Enter 10-digit number"
+                                        placeholderTextColor="#999999"
+                                        autoCorrect={false}
+                                        autoCapitalize="none"
+                                        underlineColorAndroid="transparent"
+                                        maxLength={10}
                                     />
                                 </View>
                             </View>
@@ -202,7 +341,7 @@ export default function Login() {
                 </View>
 
                 {/* Footer */}
-                <View style={styles.footer}>
+                <View style={[styles.footer, { paddingBottom: verticalScale(20) + (insets?.bottom || 0) }]}>
                     <Text style={styles.footerText}>
                         By continuing, you agree to our Terms of Service and Privacy Policy
                     </Text>
@@ -222,77 +361,77 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        paddingTop: 40,
-        paddingBottom: 30,
-        paddingHorizontal: 20,
+        paddingTop: verticalScale(40),
+        paddingBottom: verticalScale(30),
+        paddingHorizontal: scale(20),
     },
     logoContainer: {
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: verticalScale(30),
     },
     logoPlaceholder: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: scale(80),
+        height: scale(80),
+        borderRadius: scale(40),
         backgroundColor: '#2E7D32',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: verticalScale(15),
     },
     logoText: {
-        fontSize: 40,
+        fontSize: moderateScale(40),
     },
     logoImage: {
         width: '100%',
         height: '100%',
-        borderRadius: 40,
+        borderRadius: scale(40),
         borderWidth: 1,
         borderColor: 'green',
     },
     wordmark: {
-        width: 260,
-        height: 48,
-        marginTop: 4,
+        width: scale(260),
+        height: verticalScale(48),
+        marginTop: verticalScale(4),
     },
     appName: {
-        fontSize: 28,
+        fontSize: moderateScale(28),
         fontWeight: 'bold',
         color: '#2E7D32',
     },
     welcomeText: {
-        fontSize: 24,
+        fontSize: moderateScale(24),
         fontWeight: '600',
         color: '#333333',
-        marginBottom: 8,
+        marginBottom: verticalScale(8),
         textAlign: 'center',
     },
     subtitleText: {
-        fontSize: 16,
+        fontSize: moderateScale(16),
         color: '#666666',
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: moderateScale(22),
     },
     formContainer: {
         flex: 1,
-        paddingHorizontal: 20,
-        paddingTop:15,
+        paddingHorizontal: scale(20),
+        paddingTop: verticalScale(15),
     },
     inputContainer: {
-        marginBottom: 15,
+        marginBottom: verticalScale(15),
     },
     inputLabel: {
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: '500',
         color: '#333333',
-        marginBottom: 5,
+        marginBottom: verticalScale(5),
     },
     textInput: {
-        height: 56,
+        height: verticalScale(56),
         borderWidth: 2,
         borderColor: '#E0E0E0',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        fontSize: 16,
+        borderRadius: moderateScale(12),
+        paddingHorizontal: scale(16),
+        fontSize: moderateScale(16),
         backgroundColor: '#F8F9FA',
         color: '#333333',
     },
@@ -300,57 +439,60 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F8F9FA',
-        borderRadius: 12,
+        borderRadius: moderateScale(12),
         borderWidth: 2,
         borderColor: '#E0E0E0',
-        height: 56,
+        height: verticalScale(56),
     },
     countryCode: {
         backgroundColor: '#E8F5E8',
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-        borderTopLeftRadius: 10,
-        borderBottomLeftRadius: 10,
+        paddingHorizontal: scale(16),
+        paddingVertical: verticalScale(16),
+        borderTopLeftRadius: moderateScale(10),
+        borderBottomLeftRadius: moderateScale(10),
         borderRightWidth: 1,
         borderRightColor: '#E0E0E0',
     },
     countryCodeText: {
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: '600',
         color: '#2E7D32',
     },
     phoneInput: {
         flex: 1,
-        paddingHorizontal: 16,
-        fontSize: 16,
+        paddingHorizontal: scale(16),
+        fontSize: moderateScale(16),
         color: '#333333',
+        textAlignVertical: 'center',
+        includeFontPadding: false,
+        lineHeight: moderateScale(20),
     },
     otpContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 8,
-        paddingHorizontal: 4,
+        marginTop: verticalScale(8),
+        paddingHorizontal: scale(4),
     },
     otpBox: {
-        width: 45,
-        height: 56,
+        width: scale(45),
+        height: verticalScale(56),
         borderWidth: 2,
         borderColor: '#E0E0E0',
-        borderRadius: 12,
+        borderRadius: moderateScale(12),
         textAlign: 'center',
-        fontSize: 20,
+        fontSize: moderateScale(20),
         fontWeight: 'bold',
         backgroundColor: '#F8F9FA',
         color: '#333333',
-        marginHorizontal: 2,
+        marginHorizontal: scale(2),
     },
     button: {
         backgroundColor: '#2E7D32',
-        height: 56,
-        borderRadius: 12,
+        height: verticalScale(56),
+        borderRadius: moderateScale(12),
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 10,
+        marginTop: verticalScale(10),
         shadowColor: '#2E7D32',
         shadowOffset: {
             width: 0,
@@ -365,36 +507,36 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: moderateScale(18),
         fontWeight: '600',
     },
     resendButton: {
-        marginTop: 20,
+        marginTop: verticalScale(20),
         alignItems: 'center',
     },
     resendButtonText: {
         color: '#2E7D32',
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: '500',
     },
     backButton: {
-        marginTop: 16,
+        marginTop: verticalScale(16),
         alignItems: 'center',
     },
     backButtonText: {
         color: '#2E7D32',
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: '500',
         textDecorationLine: 'underline',
     },
     footer: {
-        paddingHorizontal: 20,
-        paddingBottom: 30,
+        paddingHorizontal: scale(20),
+        paddingBottom: verticalScale(30),
     },
     footerText: {
-        fontSize: 12,
+        fontSize: moderateScale(12),
         color: '#999999',
         textAlign: 'center',
-        lineHeight: 18,
+        lineHeight: moderateScale(18),
     },
 });

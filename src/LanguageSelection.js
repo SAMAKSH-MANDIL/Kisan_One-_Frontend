@@ -10,20 +10,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-
-const languages = [
-  { code: 'en', name: 'English', native: 'English' },
-  { code: 'hi', name: 'Hindi', native: 'हिंदी' },
-  { code: 'bn', name: 'Bengali', native: 'বাংলা' },
-  { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
-  { code: 'ka', name: 'Kannada', native: 'ಕನ್ನಡ' },
-  { code: 'mr', name: 'Marathi', native: 'मराठी' },
-  { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
-  { code: 'sa', name: 'Sanskrit', native: 'संस्कृतम्' },
-  { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
-  { code: 'te', name: 'Telugu', native: 'తెలుగు' },
-  { code: 'kho', name: 'Khorta', native: 'Khorta' },
-];
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
+import { languages } from './LanguageContext';
 
 export default function LanguageSelection() {
   const navigation = useNavigation();
@@ -33,8 +22,27 @@ export default function LanguageSelection() {
     setSelectedLanguage(languageCode);
   };
 
-  const handleContinue = () => {
-    // Store selected language preference
+  const handleContinue = async () => {
+    // Save language preference before navigating
+    try {
+      // Save to Firestore if user is already logged in
+      const user = auth().currentUser;
+      if (user) {
+        await firestore().collection('users').doc(user.uid).update({
+          language: selectedLanguage,
+        });
+      } else {
+        // For first-time users, save in a temp location or pass via navigation params
+        // The LanguageProvider will load it once user logs in
+      }
+      
+      // Language will be saved by LanguageProvider when user logs in
+      // For now, pass via navigation state or global variable
+      global._tempLanguage = selectedLanguage;
+    } catch (error) {
+      console.error('Error saving language:', error);
+    }
+    
     navigation.navigate('Login');
   };
 
@@ -73,15 +81,18 @@ export default function LanguageSelection() {
               ]}
               onPress={() => handleLanguageSelect(language.code)}
             >
-              <Text style={styles.flagText}>{language.flag}</Text>
-              <Text
-                style={[
-                  styles.languageText,
-                  selectedLanguage === language.code && styles.selectedLanguageText,
-                ]}
-              >
-                {language.name}
-              </Text>
+              <Text style={styles.flagText}>🌐</Text>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    styles.languageText,
+                    selectedLanguage === language.code && styles.selectedLanguageText,
+                  ]}
+                >
+                  {language.name}
+                </Text>
+                <Text style={styles.languageNative}>{language.native}</Text>
+              </View>
               {selectedLanguage === language.code && (
                 <View style={styles.checkmark}>
                   <Text style={styles.checkmarkText}>✓</Text>
@@ -183,6 +194,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     color: '#333333',
+  },
+  languageNative: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 4,
+    fontWeight: '400',
   },
   selectedLanguageText: {
     color: '#2E7D32',

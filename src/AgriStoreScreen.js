@@ -9,9 +9,12 @@ import {
   StatusBar,
   TextInput,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ms } from './utils/responsive';
 
 export default function AgriStoreScreen() {
   const [activeTab, setActiveTab] = useState('Categories');
+  const insets = useSafeAreaInsets();
 
   const tabs = ['Categories', 'Brands', 'Offers', 'New Arrivals'];
 
@@ -243,7 +246,7 @@ export default function AgriStoreScreen() {
       </View>
 
       {/* Bottom Actions */}
-      <View style={styles.bottomActions}>
+      <View style={[styles.bottomActions, { paddingBottom: 16 + (insets?.bottom || 0) }]}>
         <TouchableOpacity style={styles.cartButton}>
           <Text style={styles.cartIcon}>🛒</Text>
           <Text style={styles.cartText}>Cart (3)</Text>

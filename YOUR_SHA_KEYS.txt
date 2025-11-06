@@ -1,0 +1,45 @@
+================================================================================
+YOUR SHA KEYS FOR FIREBASE CONSOLE
+================================================================================
+
+These are the SHA keys from your DEBUG keystore (for development/testing):
+
+SHA-1:
+5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+
+SHA-256:
+FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C
+
+================================================================================
+HOW TO ADD THESE TO FIREBASE CONSOLE:
+================================================================================
+
+1. Go to: https://console.firebase.google.com/
+2. Select your project: "kisanone-official"
+3. Click ⚙️ Settings icon → Project settings
+4. Scroll down to "Your apps" section
+5. Find your Android app (package: com.kisanone.KisanOne)
+6. Click "Add fingerprint" button
+7. Add BOTH SHA-1 and SHA-256 keys (paste them one at a time)
+8. Click "Save"
+
+================================================================================
+IMPORTANT: After adding SHA keys
+================================================================================
+
+1. Download the updated google-services.json from Firebase Console
+2. Replace both files:
+   - C:\kisanone-frontend-main\google-services.json
+   - C:\kisanone-frontend-main\android\app\google-services.json
+
+3. Rebuild your app:
+   npx expo run:android
+
+================================================================================
+NOTE: For Production Release
+================================================================================
+
+If you plan to release your app to Google Play Store, you'll also need to add 
+SHA keys from your RELEASE keystore. The commands to get those are in:
+SHA_KEY_INSTRUCTIONS.md
+

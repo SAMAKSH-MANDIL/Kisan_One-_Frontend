@@ -8,9 +8,19 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useCart } from './CartContext';
 
 export default function GrowBioScreen() {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { addToCart, increment, decrement, items: cartItems } = useCart();
   const [activeTab, setActiveTab] = useState('Bio Products');
+  const tabBarHeight = typeof useBottomTabBarHeight === 'function' ? useBottomTabBarHeight() : 56;
+
+  const totalCartQuantity = (cartItems || []).reduce((sum, it) => sum + (it.quantity || 0), 0);
 
   const tabs = ['Bio Products', 'Organic Seeds', 'Bio Fertilizers', 'Bio Pesticides'];
 
@@ -131,10 +141,19 @@ export default function GrowBioScreen() {
     },
   ];
 
+  const getQuantityForProduct = (productId) => {
+    const item = (cartItems || []).find((it) => it.id === productId);
+    return item ? (item.quantity || 0) : 0;
+  };
+
   const renderProducts = (products) => (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 120 + (insets?.bottom || 0) + (tabBarHeight || 0) }}
+    >
+      <View style={styles.productsGrid}>
       {products.map((product) => (
-        <TouchableOpacity key={product.id} style={styles.productCard}>
+        <TouchableOpacity key={product.id} style={[styles.productCard, styles.productCardGridOverride]}>
           <View style={styles.productImage}>
             <Text style={styles.productEmoji}>{product.image}</Text>
             {product.discount && (
@@ -172,11 +191,36 @@ export default function GrowBioScreen() {
             <Text style={styles.productQuantity}>{product.quantity}</Text>
           </View>
           
-          <TouchableOpacity style={styles.addToCartButton}>
-            <Text style={styles.addToCartText}>Add to Cart</Text>
-          </TouchableOpacity>
+          {getQuantityForProduct(product.id) > 0 ? (
+            <View style={styles.qtyControls}>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
+                <Text style={styles.qtyBtnText}>-</Text>
+              </TouchableOpacity>
+              <Text style={styles.qtyText}>{getQuantityForProduct(product.id)}</Text>
+              <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addToCartButton}
+              onPress={() => {
+                const priceValue = Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+                addToCart({
+                  id: product.id,
+                  name: product.name,
+                  brand: product.brand,
+                  priceValue,
+                  image: product.image,
+                });
+              }}
+            >
+              <Text style={styles.addToCartText}>Add to Cart</Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
       ))}
+      </View>
     </ScrollView>
   );
 
@@ -231,12 +275,12 @@ export default function GrowBioScreen() {
       </View>
 
       {/* Bottom Actions */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity style={styles.cartButton}>
+      <View style={[styles.bottomActions, { paddingBottom: 0, bottom: Math.max(0, (tabBarHeight || 0) - 1) }] }>
+        <TouchableOpacity style={styles.cartButton} onPress={() => navigation.navigate('Cart')}>
           <Text style={styles.cartIcon}>🛒</Text>
-          <Text style={styles.cartText}>Cart (2)</Text>
+          <Text style={styles.cartText}>Cart ({totalCartQuantity})</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.checkoutButton}>
+        <TouchableOpacity style={styles.checkoutButton} onPress={() => navigation.navigate('Cart')}>
           <Text style={styles.checkoutText}>Checkout</Text>
         </TouchableOpacity>
       </View>
@@ -307,6 +351,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  productsGrid: {
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  productCardGridOverride: {
+    width: '48%',
+    marginLeft: 0,
+    marginBottom: 16,
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   productImage: {
     width: 80,
@@ -401,13 +458,47 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  qtyControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  qtyBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2E7D32',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  qtyText: {
+    width: 32,
+    textAlign: 'center',
+    marginHorizontal: 8,
+    fontWeight: '700',
+    color: '#111827',
+  },
   bottomActions: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    paddingVertical: 12,
+    borderTopWidth: 0,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 6,
   },
   cartButton: {
     flex: 1,
