@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   ScrollView,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -16,6 +18,7 @@ export default function CropDoctorScreen({ navigation }) {
   const [imageUri, setImageUri] = useState(null);
   const [showReport, setShowReport] = useState(false);
   const [reportData, setReportData] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const openCamera = async () => {
     try {
@@ -99,30 +102,109 @@ export default function CropDoctorScreen({ navigation }) {
     }
   };
 
-  const generateReport = () => {
-    // Simulate report generation - in a real app, this would call an API
-    const mockReport = {
-      disease: 'Leaf Blight',
-      confidence: '85%',
-      severity: 'Moderate',
-      crop: 'Tomato',
-      description: 'The image analysis indicates the presence of early blight on tomato leaves. This is a common fungal disease that affects tomato plants.',
-      treatment: [
-        'Remove and dispose of affected leaves immediately',
-        'Apply fungicide containing chlorothalonil or copper-based products',
-        'Improve air circulation by pruning dense foliage',
-        'Avoid overhead watering to reduce leaf wetness',
-        'Apply treatment every 7-10 days until symptoms clear'
-      ],
-      prevention: [
-        'Use disease-resistant varieties',
-        'Maintain proper spacing between plants',
-        'Rotate crops annually',
-        'Water at the base of plants, not leaves'
-      ]
-    };
-    setReportData(mockReport);
-    setShowReport(true);
+  const analyzeImage = async () => {
+    if (!imageUri) {
+      Alert.alert('No image selected', 'Please capture or select an image first.');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setShowReport(false);
+    setReportData(null);
+
+    try {
+      const formData = new FormData();
+      const fileName = imageUri.split('/').pop() || 'crop-diagnosis.jpg';
+      const extMatch = /\.([a-zA-Z0-9]+)$/.exec(fileName || '');
+      const extension = extMatch ? extMatch[1].toLowerCase() : 'jpg';
+      const mimeType = extension === 'jpg' ? 'image/jpeg' : `image/${extension}`;
+      const normalizedUri = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
+
+      formData.append('image', {
+        uri: normalizedUri,
+        name: fileName,
+        type: mimeType,
+      });
+          // link has to be change when we deploy the backend
+      const response = await fetch('https://650fa7f6fe45.ngrok-free.app/api/v1/crop-doctor/analyze', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Request failed (${response.status})`);
+      }
+
+      const data = await response.json();
+      const normalized = {
+        crop_name: data?.crop_name || 'Unknown crop',
+        crop_disease: data?.crop_disease || 'Unknown disease',
+        crop_disease_symptoms: Array.isArray(data?.crop_disease_symptoms) ? data.crop_disease_symptoms : [],
+        crop_disease_cause: Array.isArray(data?.crop_disease_cause) ? data.crop_disease_cause : [],
+        crop_disease_management: Array.isArray(data?.crop_disease_management) ? data.crop_disease_management : [],
+        crop_disease_prevention: Array.isArray(data?.crop_disease_prevention) ? data.crop_disease_prevention : [],
+        crop_disease_management_steps: Array.isArray(data?.crop_disease_management_steps) ? data.crop_disease_management_steps : [],
+        confidence_score: typeof data?.confidence_score === 'number' ? data.confidence_score : null,
+      };
+
+      setReportData(normalized);
+      setShowReport(true);
+    } catch (err) {
+      console.error('Crop doctor analyze error:', err);
+      Alert.alert('Analysis failed', 'We were unable to analyze this image. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const formatConfidenceScore = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return 'N/A';
+    }
+    if (value <= 1) {
+      return `${(value * 100).toFixed(1)}%`;
+    }
+    if (value <= 100) {
+      return `${value.toFixed(1)}%`;
+    }
+    return value.toFixed(1);
+  };
+
+  const renderListSection = (title, items) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <View style={styles.reportSection}>
+        <Text style={styles.reportLabel}>{title}:</Text>
+        {items.map((item, index) => (
+          <View key={`${title}-${index}`} style={styles.treatmentItem}>
+            <Text style={styles.treatmentBullet}>•</Text>
+            <Text style={styles.treatmentText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderStepsSection = (title, items) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <View style={styles.reportSection}>
+        <Text style={styles.reportLabel}>{title}:</Text>
+        {items.map((item, index) => (
+          <View key={`${title}-step-${index}`} style={styles.stepItem}>
+            <View style={styles.stepIndex}>
+              <Text style={styles.stepIndexText}>{index + 1}</Text>
+            </View>
+            <Text style={styles.stepText}>{item}</Text>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   return (
@@ -162,11 +244,21 @@ export default function CropDoctorScreen({ navigation }) {
               <Image source={{ uri: imageUri }} style={styles.previewImage} />
             </View>
             <TouchableOpacity 
-              style={styles.generateReportBtn} 
-              onPress={generateReport}
+              style={[styles.generateReportBtn, isAnalyzing && styles.generateReportBtnDisabled]} 
+              onPress={analyzeImage}
+              disabled={isAnalyzing}
             >
-              <Ionicons name="document-text" size={20} color="#FFFFFF" />
-              <Text style={styles.generateReportBtnText}>Generate Report</Text>
+              {isAnalyzing ? (
+                <>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={styles.generateReportBtnText}>Analyzing...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="document-text" size={20} color="#FFFFFF" />
+                  <Text style={styles.generateReportBtnText}>Generate Report</Text>
+                </>
+              )}
             </TouchableOpacity>
             
             {showReport && reportData && (
@@ -177,50 +269,25 @@ export default function CropDoctorScreen({ navigation }) {
                 </View>
                 
                 <View style={styles.reportSection}>
+                  <Text style={styles.reportLabel}>Crop Name:</Text>
+                  <Text style={styles.reportValue}>{reportData.crop_name}</Text>
+                </View>
+
+                <View style={styles.reportSection}>
                   <Text style={styles.reportLabel}>Disease Detected:</Text>
-                  <Text style={styles.reportValue}>{reportData.disease}</Text>
+                  <Text style={styles.reportValue}>{reportData.crop_disease}</Text>
                 </View>
-                
-                <View style={styles.reportRow}>
-                  <View style={styles.reportSection}>
-                    <Text style={styles.reportLabel}>Confidence:</Text>
-                    <Text style={styles.reportValue}>{reportData.confidence}</Text>
-                  </View>
-                  <View style={styles.reportSection}>
-                    <Text style={styles.reportLabel}>Severity:</Text>
-                    <Text style={styles.reportValue}>{reportData.severity}</Text>
-                  </View>
-                </View>
-                
+
                 <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Crop Type:</Text>
-                  <Text style={styles.reportValue}>{reportData.crop}</Text>
+                  <Text style={styles.reportLabel}>Confidence Score:</Text>
+                  <Text style={styles.reportValue}>{formatConfidenceScore(reportData.confidence_score)}</Text>
                 </View>
-                
-                <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Description:</Text>
-                  <Text style={styles.reportDescription}>{reportData.description}</Text>
-                </View>
-                
-                <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Treatment Recommendations:</Text>
-                  {reportData.treatment.map((item, index) => (
-                    <View key={index} style={styles.treatmentItem}>
-                      <Text style={styles.treatmentBullet}>•</Text>
-                      <Text style={styles.treatmentText}>{item}</Text>
-                    </View>
-                  ))}
-                </View>
-                
-                <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Prevention Tips:</Text>
-                  {reportData.prevention.map((item, index) => (
-                    <View key={index} style={styles.treatmentItem}>
-                      <Text style={styles.treatmentBullet}>•</Text>
-                      <Text style={styles.treatmentText}>{item}</Text>
-                    </View>
-                  ))}
-                </View>
+
+                {renderListSection('Symptoms', reportData.crop_disease_symptoms)}
+                {renderListSection('Cause', reportData.crop_disease_cause)}
+                {renderListSection('Management', reportData.crop_disease_management)}
+                {renderListSection('Prevention', reportData.crop_disease_prevention)}
+                {renderStepsSection('Management Steps', reportData.crop_disease_management_steps)}
               </View>
             )}
           </>
@@ -394,6 +461,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  generateReportBtnDisabled: {
+    opacity: 0.8,
+  },
   generateReportBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
@@ -463,6 +533,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   treatmentText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 8,
+  },
+  stepIndex: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#22A06B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  stepIndexText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  stepText: {
     flex: 1,
     fontSize: 14,
     color: '#374151',

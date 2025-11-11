@@ -81,11 +81,25 @@ export default function AIToolsScreen() {
   // Configure Gemini API key (prefers EXPO_PUBLIC_GEMINI_API_KEY; falls back to provided key)
   useEffect(() => {
     try {
-      const hasEnvKey = !!(typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_GEMINI_API_KEY);
-      if (!hasEnvKey) {
+      // Try to get API key from environment variable first
+      const envKey = (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_GEMINI_API_KEY) 
+        ? process.env.EXPO_PUBLIC_GEMINI_API_KEY 
+        : null;
+      
+      // Always set the API key explicitly (either from env or fallback)
+      if (envKey && envKey.trim()) {
+        setGeminiApiKey(envKey);
+      } else {
+        // Fallback to hardcoded key if no env key is available
         setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
       }
-    } catch (_) {}
+    } catch (error) {
+      console.log('Error setting Gemini API key:', error);
+      // Still try to set fallback key even if there's an error
+      try {
+        setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
+      } catch (_) {}
+    }
   }, []);
 
   // Auto-scroll to latest message when new messages arrive or chat opens
@@ -384,11 +398,32 @@ export default function AIToolsScreen() {
     setChatInput('');
     setChatLoading(true);
     try {
+      // Ensure API key is set before making request
+      const envKey = (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_GEMINI_API_KEY) 
+        ? process.env.EXPO_PUBLIC_GEMINI_API_KEY 
+        : null;
+      if (!envKey || !envKey.trim()) {
+        setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
+      }
+      
       const reply = await generateGeminiReply(nextMessages);
       setChatMessages((prev) => [...prev, { role: 'model', text: reply }]);
     } catch (e) {
-      setChatMessages((prev) => [...prev, { role: 'model', text: 'Sorry, I had an issue contacting Gemini. Please add your API key and try again.' }]);
       console.log('Gemini error:', e);
+      // Show more helpful error message
+      let errorMessage = 'Sorry, I had an issue contacting Gemini.';
+      if (e && e.message) {
+        if (e.message.includes('API key')) {
+          errorMessage = 'API key issue detected. Please check your Gemini API key configuration.';
+        } else if (e.message.includes('401') || e.message.includes('403')) {
+          errorMessage = 'Authentication failed. The API key may be invalid or expired.';
+        } else if (e.message.includes('429')) {
+          errorMessage = 'Rate limit exceeded. Please try again in a moment.';
+        } else {
+          errorMessage = `Error: ${e.message}`;
+        }
+      }
+      setChatMessages((prev) => [...prev, { role: 'model', text: errorMessage }]);
     } finally {
       setChatLoading(false);
     }

@@ -80,6 +80,43 @@ export default function HomeScreen() {
     return null;
   };
 
+  // Helper to ensure product has imageUri for navigation (since imageRequire can't be serialized)
+  const getProductForNavigation = (product) => {
+    if (!product) return product;
+    // If imageUri is already set, return as is
+    if (product.imageUri) return product;
+    // If imageRequire is set, try to find corresponding imageUri from product ID
+    if (product.imageRequire && product.id) {
+      const productIdToImageMap = {
+        1001: '../assets/data/seed1.png',
+        1002: '../assets/data/seed2.png',
+        1003: '../assets/data/seed3.png',
+        1004: '../assets/data/seed4.png',
+        2001: '../assets/data/cropnutri1.png',
+        2002: '../assets/data/cropnutri2.png',
+        2003: '../assets/data/cropnutri3.png',
+        2004: '../assets/data/cropnutri4.png',
+        3001: '../assets/data/cropprotection1.png',
+        3002: '../assets/data/cropprotection2.png',
+        3003: '../assets/data/cropprotection3.png',
+        3004: '../assets/data/cropprotection4.png',
+        4001: '../assets/data/gardencare1.png',
+        4002: '../assets/data/gardencare2.png',
+        4003: '../assets/data/gardencare3.png',
+        4004: '../assets/data/gardencare4.png',
+        5001: '../assets/data/agriequip1.png',
+      };
+      const baseId = typeof product.id === 'string' 
+        ? parseInt(product.id.split('-').pop()) 
+        : product.id;
+      const imagePath = productIdToImageMap[baseId];
+      if (imagePath) {
+        return { ...product, imageUri: imagePath };
+      }
+    }
+    return product;
+  };
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const drawerWidth = Math.round(width * 0.75);
   const drawerTranslateX = useRef(new Animated.Value(-drawerWidth)).current;
@@ -386,7 +423,7 @@ export default function HomeScreen() {
   };
 
   const categories = [
-    { id: 0, name: 'All', imageSource: require('../assets/data/seeds.png') },
+    { id: 0, name: 'All', imageSource: require('../assets/data/all_icon.png') },
     { id: 1, name: 'Seeds', imageSource: require('../assets/data/seeds.png') },
     { id: 2, name: 'Crop Nutrition', imageSource: require('../assets/data/Crop Nutrition.png') },
     { id: 3, name: 'Crop Protection', imageSource: require('../assets/data/Crop Protection.png') },
@@ -591,7 +628,100 @@ export default function HomeScreen() {
     },
   ];
 
-  const bestSellingProducts = [];
+  const bestSellingProducts = [
+    {
+      id: 1003,
+      name: 'Farmson Biotech FB MARUTI F1 Hybrid Corn Seeds 500GM',
+      brand: 'Farmson Biotech',
+      price: '₹1,379.00',
+      originalPrice: '₹1,558.00',
+      discount: '11% OFF',
+      size: '500 GM',
+      badge: '100+ Farmers Have ordered recently!',
+      saved: '₹179.00',
+      imageRequire: require('../assets/data/seed3.png'),
+      category: 'Seeds',
+    },
+    {
+      id: 1004,
+      name: 'Farmson Biotech FB SUVARN Clusterbean Seeds 250GM',
+      brand: 'Farmson Biotech',
+      price: '₹309.00',
+      originalPrice: '₹398.00',
+      discount: '22% OFF',
+      size: '250 GM',
+      badge: '100+ Farmers Have ordered recently!',
+      saved: '₹89.00',
+      imageRequire: require('../assets/data/seed4.png'),
+      category: 'Seeds',
+    },
+    {
+      id: 2001,
+      name: 'Katyayani Activated Humic Acid + Fulvic Acid 98 Fertilizer',
+      brand: 'Katyayani Organics',
+      price: '₹412.00',
+      originalPrice: '₹450.00',
+      discount: '8% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropnutri1.png'),
+      category: 'Crop Nutrition',
+    },
+    {
+      id: 2003,
+      name: 'katyayani Pro Grow (Gibberellic Acid 0.001% L) Plant Growth Regulator',
+      brand: 'Katyayani Organics',
+      price: '₹622.00',
+      originalPrice: '₹930.00',
+      discount: '36% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropnutri3.png'),
+      category: 'Crop Nutrition',
+    },
+    {
+      id: 3001,
+      name: 'Katyayani EMA 5 Emamectin Benzoate 5 SG Chemical Insecticide',
+      brand: 'Katyayani Organics',
+      price: '₹437.00',
+      originalPrice: '₹510.00',
+      discount: '14% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropprotection1.png'),
+      category: 'Crop Protection',
+    },
+    {
+      id: 3002,
+      name: 'Agri Venture Carzone Chlorantraniliprole 18.5% SC Chemical Insecticide',
+      brand: 'Agri Venture',
+      price: '₹399.00',
+      originalPrice: '₹1,600.00',
+      discount: '79% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/cropprotection2.png'),
+      category: 'Crop Protection',
+    },
+    {
+      id: 4003,
+      name: 'Manjula Green Pothos',
+      brand: 'NURSERY NISARGA',
+      price: '₹261.00',
+      originalPrice: '₹349.00',
+      discount: '25% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/gardencare3.png'),
+      category: 'Garden Care',
+    },
+    {
+      id: 4004,
+      name: 'Golden Money Plant',
+      brand: 'NURSERY NISARGA',
+      price: '₹261.00',
+      originalPrice: '₹349.00',
+      discount: '25% OFF',
+      badge: '100+ Farmers Have ordered recently!',
+      imageRequire: require('../assets/data/gardencare4.png'),
+      category: 'Garden Care',
+    },
+  ];
   const allProducts = [...bestSellingProducts, ...recommendedProducts];
 
   // Get recommended products based on user orders
@@ -694,7 +824,7 @@ export default function HomeScreen() {
           {/* Rewards & Actions */}
           <View style={styles.actionsSection}>
             <TouchableOpacity style={styles.actionButton}>
-              <Text style={styles.actionIcon}>🔔</Text>
+              <EvilIcons name="bell" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Cart')}>
               <View>
@@ -824,7 +954,7 @@ export default function HomeScreen() {
                           if (product.name) {
                             setSearchQuery(product.name);
                             handleSearchSubmit(product.name);
-                            navigation.navigate('ProductDetail', { product });
+                            navigation.navigate('ProductDetail', { product: getProductForNavigation(product) });
                           }
                         }}
                         activeOpacity={0.7}
@@ -865,7 +995,7 @@ export default function HomeScreen() {
                           if (product.name) {
                             setSearchQuery(product.name);
                             handleSearchSubmit(product.name);
-                            navigation.navigate('ProductDetail', { product });
+                            navigation.navigate('ProductDetail', { product: getProductForNavigation(product) });
                           }
                         }}
                         activeOpacity={0.7}
@@ -984,7 +1114,9 @@ export default function HomeScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
             {filteredRecommended.map((product) => (
-              <TouchableOpacity key={product.id} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
+              <TouchableOpacity key={product.id} style={styles.productCard} onPress={() => {
+                navigation.navigate('ProductDetail', { product: getProductForNavigation(product) });
+              }}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
@@ -1048,7 +1180,7 @@ export default function HomeScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
             {filteredRecommended.slice(0, 2).map((product) => (
-              <TouchableOpacity key={`offer-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
+              <TouchableOpacity key={`offer-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}>
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountText}>{product.discount}</Text>
                 </View>
@@ -1102,18 +1234,17 @@ export default function HomeScreen() {
         </View>
 
         {/* Best Selling Products */}
-        {filteredBestSelling.length > 0 && (
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('bestSelling')}</Text>
-              <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
-                <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t('bestSelling')}</Text>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
+              <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
+            </TouchableOpacity>
+          </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
               {filteredBestSelling.map((product) => (
-                <TouchableOpacity key={`best-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product })}>
+                <TouchableOpacity key={`best-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}>
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>{product.discount}</Text>
                   </View>
@@ -1163,9 +1294,8 @@ export default function HomeScreen() {
                   )}
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-          </View>
-        )}
+          </ScrollView>
+        </View>
 
         {/* Products - All (grid 2 per row) */}
         <View style={styles.sectionContainer}>
@@ -1174,7 +1304,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.productsGrid}>
             {filteredProducts.map((product, idx) => (
-              <TouchableOpacity key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]} onPress={() => navigation.navigate('ProductDetail', { product })}>
+              <TouchableOpacity key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]} onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}>
                 {product.discount ? (
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>{product.discount}</Text>
@@ -1969,6 +2099,7 @@ const styles = StyleSheet.create({
   productCardGridOverride: {
     width: '48%',
     marginLeft: 0,
+    marginRight: 0,
     marginBottom: 12,
   },
   addToCartText: {

@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   StatusBar,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from './CartContext';
@@ -26,6 +27,44 @@ const sectionTitles = {
   best: 'Best Selling Products',
 };
 
+// Local images map to bundle assets in release APK
+const localImageMap = {
+  '../assets/data/seed1.png': require('../assets/data/seed1.png'),
+  '../assets/data/seed2.png': require('../assets/data/seed2.png'),
+  '../assets/data/seed3.png': require('../assets/data/seed3.png'),
+  '../assets/data/seed4.png': require('../assets/data/seed4.png'),
+  '../assets/data/cropnutri1.png': require('../assets/data/cropnutri1.png'),
+  '../assets/data/cropnutri2.png': require('../assets/data/cropnutri2.png'),
+  '../assets/data/cropnutri3.png': require('../assets/data/cropnutri3.png'),
+  '../assets/data/cropnutri4.png': require('../assets/data/cropnutri4.png'),
+  '../assets/data/cropprotection1.png': require('../assets/data/cropprotection1.png'),
+  '../assets/data/cropprotection2.png': require('../assets/data/cropprotection2.png'),
+  '../assets/data/cropprotection3.png': require('../assets/data/cropprotection3.png'),
+  '../assets/data/cropprotection4.png': require('../assets/data/cropprotection4.png'),
+  '../assets/data/gardencare1.png': require('../assets/data/gardencare1.png'),
+  '../assets/data/gardencare2.png': require('../assets/data/gardencare2.png'),
+  '../assets/data/gardencare3.png': require('../assets/data/gardencare3.png'),
+  '../assets/data/gardencare4.png': require('../assets/data/gardencare4.png'),
+  '../assets/data/agriequip1.png': require('../assets/data/agriequip1.png'),
+};
+
+const getProductImageSource = (product) => {
+  // Priority: imageRequire > imageUri (from localImageMap) > imageUri (http) > null
+  if (product?.imageRequire) return product.imageRequire;
+  if (product?.imageUri) {
+    // Check if it's in our local map
+    if (localImageMap[product.imageUri]) {
+      return localImageMap[product.imageUri];
+    }
+    // Check if it's a remote URL
+    if (/^https?:/i.test(product.imageUri)) {
+      return { uri: product.imageUri };
+    }
+  }
+  // No valid image source
+  return null;
+};
+
 export default function ProductsViewAllScreen({ route, navigation }) {
   const { section = 'recommended', baseProducts = [] } = route.params || {};
   const { addToCart, increment, decrement, items: cartItems } = useCart();
@@ -38,11 +77,17 @@ export default function ProductsViewAllScreen({ route, navigation }) {
 
     return (
       <TouchableOpacity style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product: item })}>
-        <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>{item.discount}</Text>
-        </View>
+        {item.discount && (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountText}>{item.discount}</Text>
+          </View>
+        )}
         <View style={styles.productImage}>
-          <Text style={styles.productEmoji}>{item.image}</Text>
+          {getProductImageSource(item) ? (
+            <Image source={getProductImageSource(item)} style={styles.productImageTag} resizeMode="contain" />
+          ) : (
+            <Text style={styles.productEmoji}>{item.image || '📦'}</Text>
+          )}
         </View>
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
@@ -168,12 +213,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   productImage: {
-    height: 80,
+    height: 120,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
     borderRadius: 8,
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  productImageTag: {
+    width: '100%',
+    height: '100%',
   },
   productEmoji: {
     fontSize: 40,

@@ -81,7 +81,6 @@ export default function LanguageSelection() {
               ]}
               onPress={() => handleLanguageSelect(language.code)}
             >
-              <Text style={styles.flagText}>🌐</Text>
               <View style={{ flex: 1 }}>
                 <Text
                   style={[
@@ -184,10 +183,6 @@ const styles = StyleSheet.create({
   selectedLanguage: {
     backgroundColor: '#E8F5E8',
     borderColor: '#2E7D32',
-  },
-  flagText: {
-    fontSize: 24,
-    marginRight: 15,
   },
   languageText: {
     flex: 1,

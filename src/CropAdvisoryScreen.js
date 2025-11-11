@@ -253,6 +253,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+    marginTop: 30,
+
   },
   backBtn: {
     width: 44,

@@ -71,35 +71,76 @@ const productDescriptions = {
   default: 'High-quality agricultural product designed to enhance crop productivity and plant health.',
 };
 
-// Helper function to get product image source (same logic as HomeScreen)
+// Map product IDs to image paths for fallback
+const productIdToImageMap = {
+  // Seeds
+  1001: '../assets/data/seed1.png',
+  1002: '../assets/data/seed2.png',
+  1003: '../assets/data/seed3.png',
+  1004: '../assets/data/seed4.png',
+  // Crop Nutrition
+  2001: '../assets/data/cropnutri1.png',
+  2002: '../assets/data/cropnutri2.png',
+  2003: '../assets/data/cropnutri3.png',
+  2004: '../assets/data/cropnutri4.png',
+  // Crop Protection
+  3001: '../assets/data/cropprotection1.png',
+  3002: '../assets/data/cropprotection2.png',
+  3003: '../assets/data/cropprotection3.png',
+  3004: '../assets/data/cropprotection4.png',
+  // Garden Care
+  4001: '../assets/data/gardencare1.png',
+  4002: '../assets/data/gardencare2.png',
+  4003: '../assets/data/gardencare3.png',
+  4004: '../assets/data/gardencare4.png',
+  // Agri Equipment
+  5001: '../assets/data/agriequip1.png',
+};
+
+// Helper function to get product image source (improved to handle all cases)
 const getProductImageSource = (product) => {
   if (!product) return null;
   
-  console.log('Product data:', product);
-  console.log('imageRequire:', product.imageRequire);
-  console.log('imageUri:', product.imageUri);
-  
-  // Priority: imageRequire > imageUri (from localImageMap) > imageUri (http) > null
+  // Priority 1: imageRequire (direct require statement)
   if (product.imageRequire) {
-    console.log('Using imageRequire');
     return product.imageRequire;
   }
   
+  // Priority 2: imageUri from localImageMap
   if (product.imageUri) {
-    // Check if it's in our local map
     if (localImageMap[product.imageUri]) {
-      console.log('Using localImageMap for:', product.imageUri);
       return localImageMap[product.imageUri];
     }
     // Check if it's a remote URL
     if (/^https?:/i.test(product.imageUri)) {
-      console.log('Using remote URL:', product.imageUri);
       return { uri: product.imageUri };
     }
   }
   
-  // No valid image source
-  console.log('No valid image source found');
+  // Priority 3: Try to get image from product ID mapping
+  if (product.id) {
+    // Handle section-prefixed IDs (e.g., "recommended-1001", "best-1003")
+    const baseId = typeof product.id === 'string' 
+      ? parseInt(product.id.split('-').pop()) 
+      : product.id;
+    
+    if (productIdToImageMap[baseId]) {
+      const imagePath = productIdToImageMap[baseId];
+      if (localImageMap[imagePath]) {
+        return localImageMap[imagePath];
+      }
+    }
+  }
+  
+  // Priority 4: Try to reconstruct imageUri from product properties
+  // Check if product has image property that might be a path
+  if (product.image && typeof product.image === 'string' && product.image.includes('../assets')) {
+    if (localImageMap[product.image]) {
+      return localImageMap[product.image];
+    }
+  }
+  
+  // No valid image source found
   return null;
 };
 
