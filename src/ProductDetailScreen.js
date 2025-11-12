@@ -145,29 +145,12 @@ const getProductImageSource = (product) => {
 };
 
 const generateProductImages = (product) => {
-  // Get the actual image source
   const imageSource = getProductImageSource(product);
-  
-  console.log('Generated image source:', imageSource);
-  
-  // Generate multiple copies for slider
   if (imageSource) {
-    return [
-      { id: 1, source: imageSource },
-      { id: 2, source: imageSource },
-      { id: 3, source: imageSource },
-      { id: 4, source: imageSource },
-    ];
+    return [{ id: 1, source: imageSource }];
   }
-  
-  // Fallback to emoji if no image
   const baseEmoji = product.image || '📦';
-  return [
-    { id: 1, emoji: baseEmoji },
-    { id: 2, emoji: baseEmoji },
-    { id: 3, emoji: baseEmoji },
-    { id: 4, emoji: baseEmoji },
-  ];
+  return [{ id: 1, emoji: baseEmoji }];
 };
 
 export default function ProductDetailScreen({ route, navigation }) {
@@ -210,7 +193,23 @@ export default function ProductDetailScreen({ route, navigation }) {
 
   const description = productDescriptions[product.name] || productDescriptions.default;
   const images = generateProductImages(product);
-  const priceValue = Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+  const basePriceValue = Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+  // Pack/quantity options
+  const defaultPacks = [
+    { label: '200 gm' },
+    { label: '500 gm' },
+    { label: '1 kg' },
+  ];
+  const packOptions = Array.isArray(product?.packOptions) && product.packOptions.length > 0
+    ? product.packOptions
+    : defaultPacks;
+  const [selectedPackIndex, setSelectedPackIndex] = useState(0);
+  const selectedPack = packOptions[selectedPackIndex] || packOptions[0];
+  const displayedPriceText = selectedPack?.price ?? product.price;
+  const displayedPriceValue = Number(String(displayedPriceText).replace(/[^0-9.]/g, '')) || basePriceValue;
+  const displayedOriginalPrice = selectedPack?.originalPrice ?? product.originalPrice;
+  const displayedSaved = selectedPack?.saved ?? product.saved;
+  const displayedSize = selectedPack?.size ?? selectedPack?.label ?? product.size;
 
   // Update stock display
   const currentStockStatus = getStockStatus(product.id);
@@ -224,8 +223,9 @@ export default function ProductDetailScreen({ route, navigation }) {
       id: product.id,
       name: product.name,
       brand: product.brand,
-      priceValue,
+      priceValue: displayedPriceValue,
       image: product.image,
+      pack: selectedPack?.label || null,
     });
     Alert.alert('Success', 'Product added to cart!');
   };
@@ -290,13 +290,14 @@ export default function ProductDetailScreen({ route, navigation }) {
       orderNumber: orderNumber,
       date: formattedDate,
       status: 'Pending',
-      total: product.price,
+      total: displayedPriceText,
       items: 1,
       products: [
         {
           name: product.name,
           quantity: 1,
-          price: product.price,
+          price: displayedPriceText,
+          pack: selectedPack?.label || null,
         },
       ],
     };
@@ -396,20 +397,37 @@ export default function ProductDetailScreen({ route, navigation }) {
         <View style={styles.priceSection}>
           <View style={styles.priceRow}>
             <View>
-              <Text style={styles.currentPrice}>{product.price}</Text>
-              {product.originalPrice && (
-                <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+              <Text style={styles.currentPrice}>{displayedPriceText}</Text>
+              {displayedOriginalPrice && (
+                <Text style={styles.originalPrice}>{displayedOriginalPrice}</Text>
               )}
             </View>
-            {product.saved && (
+            {displayedSaved && (
               <View style={styles.savedBadge}>
-                <Text style={styles.savedText}>You save {product.saved}</Text>
+                <Text style={styles.savedText}>You save {displayedSaved}</Text>
               </View>
             )}
           </View>
-          {product.size && (
-            <Text style={styles.sizeText}>Size: {product.size}</Text>
+          {displayedSize && (
+            <Text style={styles.sizeText}>Size: {displayedSize}</Text>
           )}
+          {/* Pack/Quantity Options */}
+          <View style={styles.packContainer}>
+            <Text style={styles.packLabel}>Select Pack</Text>
+            <View style={styles.packRow}>
+              {packOptions.map((opt, idx) => (
+                <TouchableOpacity
+                  key={`${opt.label}-${idx}`}
+                  style={[styles.packChip, selectedPackIndex === idx && styles.packChipActive]}
+                  onPress={() => setSelectedPackIndex(idx)}
+                >
+                  <Text style={[styles.packChipText, selectedPackIndex === idx && styles.packChipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* Stock Information */}
@@ -642,6 +660,40 @@ const styles = StyleSheet.create({
     color: '#065F46',
     fontSize: 12,
     fontWeight: '600',
+  },
+  packContainer: {
+    marginTop: 12,
+  },
+  packLabel: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  packRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  packChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  packChipActive: {
+    backgroundColor: '#2E7D32',
+    borderColor: '#2E7D32',
+  },
+  packChipText: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  packChipTextActive: {
+    color: '#FFFFFF',
   },
   sizeText: {
     fontSize: 14,
