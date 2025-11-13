@@ -13,14 +13,12 @@ import {
   Easing,
   PanResponder,
   BackHandler,
-  TextInput,
   Alert,
-  TouchableWithoutFeedback,
   Keyboard,
   FlatList,
+  ActivityIndicator,
   Modal,
 } from 'react-native';
-import { LayoutAnimation, UIManager, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -30,8 +28,57 @@ import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from './LanguageContext';
 import Voice from '@react-native-voice/voice';
 import { vh, ms } from './utils/responsive';
+import { useNotifications } from './NotificationsContext';
+import { getProductForNavigation, getProductImageSource, resolvePackOptions, UNIT_TYPES } from './utils/products';
 
 const { width } = Dimensions.get('window');
+// Width for horizontal product cards: exactly 2 cards per viewport with spacing
+const HORIZONTAL_CARD_GAP = 12;
+const HORIZONTAL_SCREEN_PADDING = 16; // left and right
+const HORIZONTAL_CARD_WIDTH = Math.floor(
+  (width - (HORIZONTAL_SCREEN_PADDING * 2) - HORIZONTAL_CARD_GAP) / 2
+);
+
+const formatRelativeTime = (value) => {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  if (diffMs < 0) return 'Just now';
+
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 60) return 'Just now';
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min${diffMinutes === 1 ? '' : 's'} ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hr${diffHours === 1 ? '' : 's'} ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) {
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  }
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) {
+    return `${diffWeeks} week${diffWeeks === 1 ? '' : 's'} ago`;
+  }
+
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) {
+    return `${diffMonths} mo${diffMonths === 1 ? '' : 's'} ago`;
+  }
+
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears} yr${diffYears === 1 ? '' : 's'} ago`;
+};
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -42,92 +89,51 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [zoomedImage, setZoomedImage] = useState(null);
   
-  // Local images map to bundle assets in release APK
-  const localImageMap = {
-    '../assets/data/seed1.png': require('../assets/data/seed1.png'),
-    '../assets/data/seed2.png': require('../assets/data/seed2.png'),
-    '../assets/data/seed3.png': require('../assets/data/seed3.png'),
-    '../assets/data/seed4.png': require('../assets/data/seed4.png'),
-    '../assets/data/cropnutri1.png': require('../assets/data/cropnutri1.png'),
-    '../assets/data/cropnutri2.png': require('../assets/data/cropnutri2.png'),
-    '../assets/data/cropnutri3.png': require('../assets/data/cropnutri3.png'),
-    '../assets/data/cropnutri4.png': require('../assets/data/cropnutri4.png'),
-    '../assets/data/cropprotection1.png': require('../assets/data/cropprotection1.png'),
-    '../assets/data/cropprotection2.png': require('../assets/data/cropprotection2.png'),
-    '../assets/data/cropprotection3.png': require('../assets/data/cropprotection3.png'),
-    '../assets/data/cropprotection4.png': require('../assets/data/cropprotection4.png'),
-    '../assets/data/gardencare1.png': require('../assets/data/gardencare1.png'),
-    '../assets/data/gardencare2.png': require('../assets/data/gardencare2.png'),
-    '../assets/data/gardencare3.png': require('../assets/data/gardencare3.png'),
-    '../assets/data/gardencare4.png': require('../assets/data/gardencare4.png'),
-    '../assets/data/agriequip1.png': require('../assets/data/agriequip1.png'),
-  };
-
-  const getProductImageSource = (product) => {
-    // Priority: imageRequire > imageUri (from localImageMap) > imageUri (http) > null
-    if (product?.imageRequire) return product.imageRequire;
-    if (product?.imageUri) {
-      // Check if it's in our local map
-      if (localImageMap[product.imageUri]) {
-        return localImageMap[product.imageUri];
-      }
-      // Check if it's a remote URL
-      if (/^https?:/i.test(product.imageUri)) {
-        return { uri: product.imageUri };
-      }
-    }
-    // No valid image source
-    return null;
-  };
-
-  // Helper to ensure product has imageUri for navigation (since imageRequire can't be serialized)
-  const getProductForNavigation = (product) => {
-    if (!product) return product;
-    // If imageUri is already set, return as is
-    if (product.imageUri) return product;
-    // If imageRequire is set, try to find corresponding imageUri from product ID
-    if (product.imageRequire && product.id) {
-      const productIdToImageMap = {
-        1001: '../assets/data/seed1.png',
-        1002: '../assets/data/seed2.png',
-        1003: '../assets/data/seed3.png',
-        1004: '../assets/data/seed4.png',
-        2001: '../assets/data/cropnutri1.png',
-        2002: '../assets/data/cropnutri2.png',
-        2003: '../assets/data/cropnutri3.png',
-        2004: '../assets/data/cropnutri4.png',
-        3001: '../assets/data/cropprotection1.png',
-        3002: '../assets/data/cropprotection2.png',
-        3003: '../assets/data/cropprotection3.png',
-        3004: '../assets/data/cropprotection4.png',
-        4001: '../assets/data/gardencare1.png',
-        4002: '../assets/data/gardencare2.png',
-        4003: '../assets/data/gardencare3.png',
-        4004: '../assets/data/gardencare4.png',
-        5001: '../assets/data/agriequip1.png',
-      };
-      const baseId = typeof product.id === 'string' 
-        ? parseInt(product.id.split('-').pop()) 
-        : product.id;
-      const imagePath = productIdToImageMap[baseId];
-      if (imagePath) {
-        return { ...product, imageUri: imagePath };
-      }
-    }
-    return product;
-  };
-
+  // Refs for scrolling to sections
+  const scrollViewRef = useRef(null);
+  const recommendedSectionRef = useRef(null);
+  const todaysOfferSectionRef = useRef(null);
+  const bestSellingSectionRef = useRef(null);
+  const productsSectionRef = useRef(null);
+  
+  // Store section positions
+  const [sectionPositions, setSectionPositions] = useState({
+    recommended: 0,
+    todaysOffer: 0,
+    bestSelling: 0,
+    products: 0,
+  });
+  const isInitialMount = useRef(true);
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    markAsRead,
+    markAllAsRead,
+    refreshNotifications,
+  } = useNotifications();
+  const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
+  
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const drawerWidth = Math.round(width * 0.75);
   const drawerTranslateX = useRef(new Animated.Value(-drawerWidth)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const dragX = useRef(0).current;
   const [profileName, setProfileName] = useState('Farmer');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
-  const homeSearchInputRef = useRef(null);
+  // State for selected pack/quantity per product
+  const [selectedPackById, setSelectedPackById] = useState({});
+  const [sizePickerProductId, setSizePickerProductId] = useState(null);
+
+  const getPackInfo = useCallback((product) => {
+    const packOptions = resolvePackOptions(product);
+    const selectedIdx = typeof selectedPackById[product.id] === 'number'
+      ? selectedPackById[product.id]
+      : 0;
+    const selectedPack = packOptions[selectedIdx] || packOptions[0] || { label: '', size: '' };
+    return { packOptions, selectedPack, selectedIdx };
+  }, [selectedPackById]);
 
   // Calculate total quantity of items in cart
   const totalCartQuantity = cartItems.reduce((total, item) => total + item.quantity, 0);
@@ -147,15 +153,6 @@ export default function HomeScreen() {
       }
     });
     return () => unsub();
-  }, []);
-
-  // Enable smooth layout transitions for dropdown (Android requires this)
-  useEffect(() => {
-    try {
-      if (Platform.OS === 'android' && UIManager && typeof UIManager.setLayoutAnimationEnabledExperimental === 'function') {
-        UIManager.setLayoutAnimationEnabledExperimental(true);
-      }
-    } catch (_) {}
   }, []);
 
   // Load user orders for recommendations
@@ -204,76 +201,6 @@ export default function HomeScreen() {
     return () => unsub();
   }, []);
 
-  // Refresh search dropdown data
-  const refreshSearchData = useCallback(async () => {
-    const u = auth().currentUser;
-    if (!u) return;
-
-    try {
-      const userDoc = await firestore().collection('users').doc(u.uid).get();
-      if (userDoc.exists) {
-        const data = userDoc.data() || {};
-        if (data.recentSearches && Array.isArray(data.recentSearches)) {
-          setRecentSearches(data.recentSearches.slice(0, 10));
-        } else {
-          setRecentSearches([]);
-        }
-      }
-
-      const ordersSnapshot = await firestore()
-        .collection('orders')
-        .where('userId', '==', u.uid)
-        .limit(20)
-        .get();
-      
-      if (ordersSnapshot && !ordersSnapshot.empty) {
-        const orders = [];
-        ordersSnapshot.forEach((doc) => {
-          if (doc && doc.exists) {
-            const data = doc.data();
-            if (data && data.items && Array.isArray(data.items)) {
-              const itemsWithTimestamp = data.items.map(item => ({
-                ...item,
-                orderTimestamp: data.createdAt ? data.createdAt.toMillis() : 0,
-              }));
-              orders.push(...itemsWithTimestamp);
-            }
-          }
-        });
-        orders.sort((a, b) => (b.orderTimestamp || 0) - (a.orderTimestamp || 0));
-        setUserOrders(orders.slice(0, 10));
-      } else {
-        setUserOrders([]);
-      }
-    } catch (error) {
-      console.error('Error refreshing search data:', error);
-    }
-  }, []);
-
-  // Save search to recent searches
-  const handleSearchSubmit = useCallback(async (query) => {
-    if (!query || !query.trim()) return;
-    
-    const trimmedQuery = query.trim();
-    
-    const updated = [trimmedQuery, ...recentSearches.filter(s => s !== trimmedQuery)].slice(0, 10);
-    setRecentSearches(updated);
-    
-    const u = auth().currentUser;
-    if (u) {
-      try {
-        await firestore().collection('users').doc(u.uid).update({
-          recentSearches: updated,
-        });
-      } catch (error) {
-        console.error('Error saving search:', error);
-      }
-    }
-    
-    setShowSearchDropdown(false);
-    setSearchQuery(trimmedQuery);
-  }, [recentSearches]);
-
   // Back button closes drawer (Android)
   useEffect(() => {
     const onBack = () => {
@@ -300,8 +227,7 @@ export default function HomeScreen() {
         Voice.onSpeechResults = (e) => {
           const result = e && e.value && e.value[0];
           if (result) {
-            setSearchQuery(result);
-            handleSearchSubmit(result);
+            openSearchScreen(result, { submitOnOpen: true });
           }
           setIsListening(false);
         };
@@ -321,7 +247,7 @@ export default function HomeScreen() {
         }
       } catch (_) {}
     };
-  }, [handleSearchSubmit]);
+  }, [openSearchScreen]);
 
   const startVoiceRecognition = async () => {
     try {
@@ -381,7 +307,6 @@ export default function HomeScreen() {
   ).current;
 
   const openDrawer = () => {
-    setShowSearchDropdown(false);
     Keyboard.dismiss();
     setIsDrawerOpen(true);
     Animated.parallel([
@@ -444,6 +369,7 @@ export default function HomeScreen() {
       saved: '₹54.00',
       imageRequire: require('../assets/data/seed1.png'),
       category: 'Seeds',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 1002,
@@ -455,6 +381,7 @@ export default function HomeScreen() {
       saved: '₹189.00',
       imageRequire: require('../assets/data/seed2.png'),
       category: 'Seeds',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 1003,
@@ -468,6 +395,7 @@ export default function HomeScreen() {
       saved: '₹179.00',
       imageRequire: require('../assets/data/seed3.png'),
       category: 'Seeds',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 1004,
@@ -481,6 +409,7 @@ export default function HomeScreen() {
       saved: '₹89.00',
       imageRequire: require('../assets/data/seed4.png'),
       category: 'Seeds',
+      unitType: UNIT_TYPES.SOLID,
     },
     // Crop Nutrition
     {
@@ -493,6 +422,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropnutri1.png'),
       category: 'Crop Nutrition',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 2002,
@@ -504,6 +434,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropnutri2.png'),
       category: 'Crop Nutrition',
+      unitType: UNIT_TYPES.LIQUID,
     },
     {
       id: 2003,
@@ -515,6 +446,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropnutri3.png'),
       category: 'Crop Nutrition',
+      unitType: UNIT_TYPES.LIQUID,
     },
     {
       id: 2004,
@@ -526,6 +458,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropnutri4.png'),
       category: 'Crop Nutrition',
+      unitType: UNIT_TYPES.LIQUID,
     },
     // Crop Protection
     {
@@ -538,6 +471,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropprotection1.png'),
       category: 'Crop Protection',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 3002,
@@ -549,6 +483,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropprotection2.png'),
       category: 'Crop Protection',
+      unitType: UNIT_TYPES.LIQUID,
     },
     {
       id: 3003,
@@ -559,6 +494,7 @@ export default function HomeScreen() {
       discount: '20% OFF',
       imageRequire: require('../assets/data/cropprotection3.png'),
       category: 'Crop Protection',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 3004,
@@ -570,6 +506,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropprotection4.png'),
       category: 'Crop Protection',
+      unitType: UNIT_TYPES.LIQUID,
     },
     // Garden Care
     {
@@ -581,6 +518,7 @@ export default function HomeScreen() {
       discount: '25% OFF',
       imageRequire: require('../assets/data/gardencare1.png'),
       category: 'Garden Care',
+      unitType: UNIT_TYPES.UNIT,
     },
     {
       id: 4002,
@@ -591,6 +529,7 @@ export default function HomeScreen() {
       discount: '22% OFF',
       imageRequire: require('../assets/data/gardencare2.png'),
       category: 'Garden Care',
+      unitType: UNIT_TYPES.UNIT,
     },
     {
       id: 4003,
@@ -602,6 +541,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/gardencare3.png'),
       category: 'Garden Care',
+      unitType: UNIT_TYPES.UNIT,
     },
     {
       id: 4004,
@@ -613,6 +553,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/gardencare4.png'),
       category: 'Garden Care',
+      unitType: UNIT_TYPES.UNIT,
     },
     // Agri Equipment
     {
@@ -625,6 +566,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/agriequip1.png'),
       category: 'Agri Equipment',
+      unitType: UNIT_TYPES.UNIT,
     },
   ];
 
@@ -641,6 +583,7 @@ export default function HomeScreen() {
       saved: '₹179.00',
       imageRequire: require('../assets/data/seed3.png'),
       category: 'Seeds',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 1004,
@@ -654,6 +597,7 @@ export default function HomeScreen() {
       saved: '₹89.00',
       imageRequire: require('../assets/data/seed4.png'),
       category: 'Seeds',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 2001,
@@ -665,6 +609,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropnutri1.png'),
       category: 'Crop Nutrition',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 2003,
@@ -676,6 +621,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropnutri3.png'),
       category: 'Crop Nutrition',
+      unitType: UNIT_TYPES.LIQUID,
     },
     {
       id: 3001,
@@ -687,6 +633,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropprotection1.png'),
       category: 'Crop Protection',
+      unitType: UNIT_TYPES.SOLID,
     },
     {
       id: 3002,
@@ -698,6 +645,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/cropprotection2.png'),
       category: 'Crop Protection',
+      unitType: UNIT_TYPES.LIQUID,
     },
     {
       id: 4003,
@@ -709,6 +657,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/gardencare3.png'),
       category: 'Garden Care',
+      unitType: UNIT_TYPES.UNIT,
     },
     {
       id: 4004,
@@ -720,6 +669,7 @@ export default function HomeScreen() {
       badge: '100+ Farmers Have ordered recently!',
       imageRequire: require('../assets/data/gardencare4.png'),
       category: 'Garden Care',
+      unitType: UNIT_TYPES.UNIT,
     },
   ];
   const allProducts = [...bestSellingProducts, ...recommendedProducts];
@@ -766,21 +716,186 @@ export default function HomeScreen() {
       result = result.filter(p => (p.category || '').toLowerCase() === selectedCategory.toLowerCase());
     }
     
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(product =>
-        product.name.toLowerCase().includes(query) ||
-        product.brand.toLowerCase().includes(query)
-      );
-    }
-    
     return result;
   };
 
   const filteredRecommended = filterProducts(recommendedProducts);
   const filteredBestSelling = filterProducts(bestSellingProducts);
   const filteredProducts = filterProducts(allProducts);
+  const todaysOfferProducts = filteredRecommended.slice(0, 2);
+  
+  // Scroll to first section with products when category changes
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    if (!scrollViewRef.current) return;
+    
+    // If "All" is selected, scroll to top or first section
+    if (selectedCategory === 'All') {
+      const timer = setTimeout(() => {
+        if (sectionPositions.recommended > 0) {
+          scrollViewRef.current?.scrollTo({
+            y: sectionPositions.recommended - 20,
+            animated: true,
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    
+    // Small delay to ensure layout is complete
+    const timer = setTimeout(() => {
+      let targetPosition = null;
+      
+      // Check which sections have products and scroll to the first one
+      if (filteredRecommended.length > 0 && sectionPositions.recommended > 0) {
+        targetPosition = sectionPositions.recommended;
+      } else if (todaysOfferProducts.length > 0 && sectionPositions.todaysOffer > 0) {
+        targetPosition = sectionPositions.todaysOffer;
+      } else if (filteredBestSelling.length > 0 && sectionPositions.bestSelling > 0) {
+        targetPosition = sectionPositions.bestSelling;
+      } else if (filteredProducts.length > 0 && sectionPositions.products > 0) {
+        targetPosition = sectionPositions.products;
+      }
+      
+      if (targetPosition !== null) {
+        scrollViewRef.current.scrollTo({
+          y: targetPosition - 20, // Offset for better visibility
+          animated: true,
+        });
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [selectedCategory, sectionPositions, filteredRecommended.length, todaysOfferProducts.length, filteredBestSelling.length, filteredProducts.length]);
+
+  const openSearchScreen = useCallback(
+    (initialQuery = '', options = {}) => {
+      navigation.navigate('Search', {
+        initialQuery,
+        prefetchedRecentSearches: recentSearches,
+        recommendedProducts,
+        contextualRecommended: getRecommendedFromOrders(),
+        allProducts,
+        submitOnOpen: Boolean(options.submitOnOpen),
+      });
+    },
+    [
+      navigation,
+      recentSearches,
+      recommendedProducts,
+      getRecommendedFromOrders,
+      allProducts,
+    ],
+  );
+
+  const getNotificationIconName = useCallback((type) => {
+    switch ((type || '').toLowerCase()) {
+      case 'order':
+      case 'order_update':
+      case 'orders':
+        return 'cube-outline';
+      case 'promotion':
+      case 'promo':
+      case 'offer':
+      case 'marketing':
+        return 'pricetag-outline';
+      case 'support':
+      case 'help':
+        return 'chatbubble-ellipses-outline';
+      case 'alert':
+        return 'warning-outline';
+      default:
+        return 'notifications-outline';
+    }
+  }, []);
+
+  const handleNotificationPress = useCallback(
+    (notificationItem) => {
+      if (!notificationItem) return;
+
+      if (notificationItem.id && !notificationItem.read) {
+        markAsRead(notificationItem.id);
+      }
+
+      const targetScreen =
+        notificationItem?.cta?.screen ||
+        notificationItem?.data?.screen ||
+        notificationItem?.data?.route;
+      const params =
+        notificationItem?.cta?.params || notificationItem?.data?.params || {};
+
+      if (targetScreen) {
+        try {
+          navigation.navigate(targetScreen, params);
+          setIsNotificationsVisible(false);
+        } catch (error) {
+          console.warn('Unable to navigate from notification:', error);
+        }
+      }
+    },
+    [markAsRead, navigation],
+  );
+
+  const renderNotificationItem = useCallback(
+    ({ item }) => {
+      if (!item) return null;
+      const isUnread = !item.read;
+      const iconName = getNotificationIconName(item.type);
+      return (
+        <TouchableOpacity
+          style={[
+            styles.notificationItem,
+            isUnread && styles.notificationItemUnread,
+          ]}
+          onPress={() => handleNotificationPress(item)}
+          activeOpacity={0.85}
+        >
+          <View
+            style={[
+              styles.notificationIcon,
+              isUnread && styles.notificationIconUnread,
+            ]}
+          >
+            <Ionicons
+              name={iconName}
+              size={18}
+              color={isUnread ? '#1E7C31' : '#64748B'}
+            />
+          </View>
+          <View style={styles.notificationContent}>
+            <Text style={styles.notificationTitle} numberOfLines={2}>
+              {item.title || 'Notification'}
+            </Text>
+            {item.body ? (
+              <Text style={styles.notificationBody} numberOfLines={2}>
+                {item.body}
+              </Text>
+            ) : null}
+            <Text style={styles.notificationTime}>
+              {formatRelativeTime(item.createdAt)}
+            </Text>
+          </View>
+          {isUnread ? <View style={styles.notificationUnreadDot} /> : null}
+        </TouchableOpacity>
+      );
+    },
+    [getNotificationIconName, handleNotificationPress],
+  );
+
+  const notificationKeyExtractor = useCallback(
+    (item, index) => item?.id || `notification-${index}`,
+    [],
+  );
+
+  useEffect(() => {
+    if (!isNotificationsVisible) return;
+    refreshNotifications();
+  }, [isNotificationsVisible, refreshNotifications]);
 
   const features = [
     { icon: '🛡️', title: 'Safe & Secure Payment', subtitle: '100% Protected' },
@@ -823,8 +938,27 @@ export default function HomeScreen() {
 
           {/* Rewards & Actions */}
           <View style={styles.actionsSection}>
-            <TouchableOpacity style={styles.actionButton}>
-              <EvilIcons name="bell" size={24} color="#FFFFFF" />
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => {
+                setIsNotificationsVisible(true);
+                if (unreadCount > 0) {
+                  markAllAsRead().catch((error) =>
+                    console.warn('Failed to mark notifications as read:', error)
+                  );
+                }
+              }}
+            >
+              <View>
+                <EvilIcons name="bell" size={24} color="#FFFFFF" />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Cart')}>
               <View>
@@ -842,207 +976,29 @@ export default function HomeScreen() {
         </View>
 
         {/* Search Bar */}
-        <View 
-          style={[styles.searchContainer, isDrawerOpen && { zIndex: 0 }]}
-          pointerEvents={isDrawerOpen ? 'none' : 'auto'}
-        >
-          <View style={styles.searchBar}>
+        <View style={styles.searchContainer}>
+          <TouchableOpacity
+            style={styles.searchBar}
+            activeOpacity={0.85}
+            onPress={() => openSearchScreen()}
+          >
             <EvilIcons name="search" size={22} color="#666666" style={{ marginRight: 12 }} />
-            <TextInput
-              ref={homeSearchInputRef}
-              style={styles.searchInput}
-              placeholder={t('searchProducts')}
-              placeholderTextColor="#999999"
-              value={searchQuery}
-              onChangeText={(text) => {
-                setSearchQuery(text);
-                try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
-                setShowSearchDropdown(true);
-              }}
-              onFocus={async () => {
-                try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
-                setShowSearchDropdown(true);
-                await refreshSearchData();
-              }}
-              onSubmitEditing={() => handleSearchSubmit(searchQuery)}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity 
-                onPress={() => {
-                  setSearchQuery('');
-                  setShowSearchDropdown(false);
-                }} 
-                style={{ marginRight: 8 }}
-              >
-                <EvilIcons name="close" size={18} color="#666666" />
-              </TouchableOpacity>
-            )}
-            <View style={styles.searchActions}>
-              <TouchableOpacity
-                style={[styles.micButton, isListening && styles.micButtonActive]}
-                onPress={handleMicPress}
-              >
-                <Ionicons name={isListening ? "mic" : "mic-outline"} size={18} color="#FFFFFF" />
-              </TouchableOpacity>
-              <View style={styles.separator} />
-            </View>
-          </View>
-          
-          {/* Search Dropdown */}
-          {showSearchDropdown && (
-            <View style={[styles.searchDropdown, { paddingBottom: 8 + (insets?.bottom || 0) }]}>
-              <View style={{ alignItems: 'center', paddingTop: 6, paddingBottom: 2 }}>
-                <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0' }} />
-              </View>
-              <ScrollView 
-                style={styles.dropdownScrollView}
-                showsVerticalScrollIndicator={true}
-                nestedScrollEnabled={true}
-                keyboardShouldPersistTaps="always"
-                decelerationRate="normal"
-                bounces={true}
-                overScrollMode="always"
-                scrollEnabled={true}
-                keyboardDismissMode="on-drag"
-                scrollEventThrottle={16}
-                contentContainerStyle={{ paddingBottom: 12 + (insets?.bottom || 0) }}
-              >
-                {/* Recently Searched */}
-                {recentSearches.length > 0 && (
-                  <View style={styles.dropdownSection}>
-                    <Text style={styles.dropdownSectionTitleBold}>{t('recentSearches')}</Text>
-                    <FlatList
-                      data={(recentSearches || []).filter(Boolean)}
-                      keyExtractor={(item, idx) => `${item}-${idx}`}
-                      renderItem={({ item: search }) => (
-                        <TouchableOpacity
-                          style={styles.recentSearchCard}
-                          onPress={() => {
-                            setSearchQuery(search);
-                            handleSearchSubmit(search);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.recentSearchIcon}>
-                            <Ionicons name="time-outline" size={20} color="#666666" />
-                          </View>
-                          <Text style={styles.recentSearchText} numberOfLines={2}>{search}</Text>
-                        </TouchableOpacity>
-                      )}
-                      horizontal
-                      showsHorizontalScrollIndicator={true}
-                      contentContainerStyle={styles.horizontalScrollContent}
-                      nestedScrollEnabled
-                      decelerationRate="fast"
-                      snapToAlignment="start"
-                      bounces
-                    />
-                  </View>
-                )}
-                
-                {/* Recommended Products */}
-                <View style={styles.dropdownSection}>
-                  <Text style={styles.dropdownSectionTitleBold}>{t('recommendedForYou')}</Text>
-                  <FlatList
-                    data={(getRecommendedFromOrders() || recommendedProducts).slice(0, 30).filter(p => p && p.id)}
-                    keyExtractor={(item, idx) => `rec-${item.id}-${idx}`}
-                    renderItem={({ item: product, index: idx }) => (
-                      <TouchableOpacity
-                        key={`rec-${product.id}-${idx}`}
-                        style={styles.dropdownProductCard}
-                        onPress={() => {
-                          if (product.name) {
-                            setSearchQuery(product.name);
-                            handleSearchSubmit(product.name);
-                            navigation.navigate('ProductDetail', { product: getProductForNavigation(product) });
-                          }
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.dropdownProductCardImage}>
-                          {getProductImageSource(product) ? (
-                            <Image source={getProductImageSource(product)} style={styles.dropdownProductImage} />
-                          ) : (
-                            <Text style={styles.dropdownProductCardEmoji}>📦</Text>
-                          )}
-                        </View>
-                        <Text style={styles.dropdownProductCardText} numberOfLines={2}>{product.name || ''}</Text>
-                        <Text style={styles.dropdownProductCardBrand} numberOfLines={1}>{product.brand || ''}</Text>
-                        <Text style={styles.dropdownProductCardPrice}>{product.price || ''}</Text>
-                      </TouchableOpacity>
-                    )}
-                    horizontal
-                    showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={styles.horizontalScrollContent}
-                    nestedScrollEnabled
-                    decelerationRate="fast"
-                    snapToAlignment="start"
-                    bounces
-                  />
-                </View>
-                
-                {/* Popular Products */}
-                <View style={styles.dropdownSection}>
-                  <Text style={styles.dropdownSectionTitleBold}>{t('popularProducts')}</Text>
-                  <FlatList
-                    data={(trendingProducts || []).slice(0, 20).filter(p => p && p.id)}
-                    keyExtractor={(item, idx) => `pop-${item.id}-${idx}`}
-                    renderItem={({ item: product, index: idx }) => (
-                      <TouchableOpacity
-                        key={`pop-${product.id}-${idx}`}
-                        style={styles.dropdownProductCard}
-                        onPress={() => {
-                          if (product.name) {
-                            setSearchQuery(product.name);
-                            handleSearchSubmit(product.name);
-                            navigation.navigate('ProductDetail', { product: getProductForNavigation(product) });
-                          }
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.dropdownProductCardImage}>
-                          {getProductImageSource(product) ? (
-                            <Image source={getProductImageSource(product)} style={styles.dropdownProductImage} />
-                          ) : (
-                            <Text style={styles.dropdownProductCardEmoji}>📦</Text>
-                          )}
-                        </View>
-                        <Text style={styles.dropdownProductCardText} numberOfLines={2}>{product.name || ''}</Text>
-                        <Text style={styles.dropdownProductCardBrand} numberOfLines={1}>{product.brand || ''}</Text>
-                        <Text style={styles.dropdownProductCardPrice}>{product.price || ''}</Text>
-                      </TouchableOpacity>
-                    )}
-                    horizontal
-                    showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={styles.horizontalScrollContent}
-                    nestedScrollEnabled
-                    decelerationRate="fast"
-                    snapToAlignment="start"
-                    bounces
-                  />
-                </View>
-              </ScrollView>
-            </View>
-          )}
+            <Text style={styles.searchPlaceholder}>{t('searchProducts')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.micButton, isListening && styles.micButtonActive]}
+            onPress={handleMicPress}
+          >
+            <Ionicons name={isListening ? "mic" : "mic-outline"} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Click outside to close dropdown */}
-      {showSearchDropdown && (
-        <TouchableWithoutFeedback onPress={() => {
-          try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
-          setShowSearchDropdown(false);
-          Keyboard.dismiss();
-        }}>
-          <View style={styles.dropdownOverlay} />
-        </TouchableWithoutFeedback>
-      )}
-
       <ScrollView 
+        ref={scrollViewRef}
         style={styles.content} 
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!showSearchDropdown}
-        onScrollBeginDrag={() => { if (!showSearchDropdown) { try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {} } setShowSearchDropdown(false); }}
+        scrollEnabled={true}
         contentContainerStyle={{ paddingBottom: (insets?.bottom || 0) + 16 }}
       >
         {/* Categories */}
@@ -1057,7 +1013,6 @@ export default function HomeScreen() {
               ]}
               onPress={() => {
                 setSelectedCategory(category.name);
-                setSearchQuery('');
               }}
             >
               <View style={[
@@ -1104,7 +1059,14 @@ export default function HomeScreen() {
         </View>
 
         {/* Recommended Products */}
-        <View style={styles.sectionContainer}>
+        <View 
+          ref={recommendedSectionRef}
+          style={styles.sectionContainer}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            setSectionPositions((prev) => ({ ...prev, recommended: y }));
+          }}
+        >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t('recommended')}</Text>
             <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'recommended', baseProducts: recommendedProducts })}>
@@ -1112,145 +1074,34 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
-            {filteredRecommended.map((product) => (
-              <TouchableOpacity key={product.id} style={styles.productCard} onPress={() => {
-                navigation.navigate('ProductDetail', { product: getProductForNavigation(product) });
-              }}>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{product.discount}</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.productImage}
-                  onPress={() => setZoomedImage(getProductImageSource(product))}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 4 }}
+          >
+            {filteredRecommended.map((product, index) => {
+              const totalItems = filteredRecommended.length;
+              const { packOptions, selectedPack } = getPackInfo(product);
+              const displayedSize = selectedPack?.size ?? selectedPack?.label ?? product.size;
+              const displayedPrice = selectedPack?.price ?? product.price;
+              const priceValue = Number(String(displayedPrice).replace(/[^0-9.]/g, '')) || Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+              const marginLeft = index === 0 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
+              const marginRight = index === totalItems - 1 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
+              
+              return (
+                <View
+                  key={product.id}
+                  style={[
+                    styles.productCard,
+                    { width: HORIZONTAL_CARD_WIDTH, marginLeft, marginRight },
+                  ]}
                 >
-                  {getProductImageSource(product) ? (
-                    <Image source={getProductImageSource(product)} style={styles.productImageTag} />
-                  ) : (
-                    <Text style={styles.productEmoji}>📦</Text>
-                  )}
-                </TouchableOpacity>
-                <Text style={styles.productName} numberOfLines={2}>
-                  {product.name}
-                </Text>
-                <Text style={styles.productBrand}>{product.brand}</Text>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.currentPrice}>{product.price}</Text>
-                  <Text style={styles.originalPrice}>{product.originalPrice}</Text>
-                </View>
-                <View style={styles.savedContainer}>
-                  <Text style={styles.savedIcon}>💚</Text>
-                  <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                </View>
-                <Text style={styles.productSize}>Size {product.size}</Text>
-                {cartItems.find((it) => it.id === product.id) ? (
-                  <View style={styles.qtyControls}>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
-                      <Text style={styles.qtyBtnText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
-                      <Text style={styles.qtyBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart({
-                    id: product.id,
-                    name: product.name,
-                    brand: product.brand,
-                    priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image || product.imageUri,
-                  })}>
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Today's Offers */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Offer</Text>
-            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'offers', baseProducts: filteredRecommended.slice(0, 2) })}>
-              <Text style={styles.viewAllBtnText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
-            {filteredRecommended.slice(0, 2).map((product) => (
-              <TouchableOpacity key={`offer-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{product.discount}</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.productImage}
-                  onPress={() => setZoomedImage(getProductImageSource(product))}
-                >
-                  {getProductImageSource(product) ? (
-                    <Image source={getProductImageSource(product)} style={styles.productImageTag} />
-                  ) : (
-                    <Text style={styles.productEmoji}>📦</Text>
-                  )}
-                </TouchableOpacity>
-                <Text style={styles.productName} numberOfLines={2}>
-                  {product.name}
-                </Text>
-                <Text style={styles.productBrand}>{product.brand}</Text>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.currentPrice}>{product.price}</Text>
-                  <Text style={styles.originalPrice}>{product.originalPrice}</Text>
-                </View>
-                <View style={styles.savedContainer}>
-                  <Text style={styles.savedIcon}>💚</Text>
-                  <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                </View>
-                <Text style={styles.productSize}>Size {product.size}</Text>
-                {cartItems.find((it) => it.id === product.id) ? (
-                  <View style={styles.qtyControls}>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
-                      <Text style={styles.qtyBtnText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
-                      <Text style={styles.qtyBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart({
-                    id: product.id,
-                    name: product.name,
-                    brand: product.brand,
-                    priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image || product.imageUri,
-                  })}>
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Best Selling Products */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t('bestSelling')}</Text>
-            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
-              <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16, paddingBottom: 4 }}>
-              {filteredBestSelling.map((product) => (
-                <TouchableOpacity key={`best-${product.id}`} style={styles.productCard} onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}>
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>{product.discount}</Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.productImage}
-                    onPress={() => setZoomedImage(getProductImageSource(product))}
+                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
                   >
                     {getProductImageSource(product) ? (
                       <Image source={getProductImageSource(product)} style={styles.productImageTag} />
@@ -1263,104 +1114,517 @@ export default function HomeScreen() {
                   </Text>
                   <Text style={styles.productBrand}>{product.brand}</Text>
                   <View style={styles.priceContainer}>
-                    <Text style={styles.currentPrice}>{product.price}</Text>
+                    <Text style={styles.currentPrice}>{displayedPrice}</Text>
                     <Text style={styles.originalPrice}>{product.originalPrice}</Text>
                   </View>
                   <View style={styles.savedContainer}>
                     <Text style={styles.savedIcon}>💚</Text>
                     <Text style={styles.savedText}>Saved Price {product.saved}</Text>
                   </View>
-                  <Text style={styles.productSize}>Size {product.size}</Text>
+                  {packOptions.length > 0 ? (
+                    <TouchableOpacity 
+                      style={styles.sizeDropdown}
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        setSizePickerProductId(product.id);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                      <Ionicons name="chevron-down" size={16} color="#666666" />
+                    </TouchableOpacity>
+                  ) : (
+                    displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
+                  )}
                   {cartItems.find((it) => it.id === product.id) ? (
                     <View style={styles.qtyControls}>
-                      <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
                         <Text style={styles.qtyBtnText}>-</Text>
                       </TouchableOpacity>
                       <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
-                      <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); increment(product.id); }}>
                         <Text style={styles.qtyBtnText}>+</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart({
-                      id: product.id,
-                      name: product.name,
-                      brand: product.brand,
-                      priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                      image: product.image || product.imageUri,
-                    })}>
+                    <TouchableOpacity 
+                      style={styles.addToCartButton} 
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        addToCart({
+                          id: product.id,
+                          name: product.name,
+                          brand: product.brand,
+                          priceValue: priceValue,
+                          image: product.image || product.imageUri,
+                          pack: displayedSize,
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
                       <Text style={styles.addToCartText}>Add to Cart</Text>
                     </TouchableOpacity>
                   )}
-                </TouchableOpacity>
-              ))}
+                </View>
+              );
+            })}
           </ScrollView>
         </View>
 
-        {/* Products - All (grid 2 per row) */}
-        <View style={styles.sectionContainer}>
+        {/* Today's Offers */}
+        <View 
+          ref={todaysOfferSectionRef}
+          style={styles.sectionContainer}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            setSectionPositions((prev) => ({ ...prev, todaysOffer: y }));
+          }}
+        >
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Products</Text>
+            <Text style={styles.sectionTitle}>Today's Offer</Text>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'offers', baseProducts: todaysOfferProducts })}>
+              <Text style={styles.viewAllBtnText}>View All</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.productsGrid}>
-            {filteredProducts.map((product, idx) => (
-              <TouchableOpacity key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]} onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}>
-                {product.discount ? (
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 4 }}
+          >
+            {todaysOfferProducts.map((product, index) => {
+              const totalItems = todaysOfferProducts.length;
+              const { packOptions, selectedPack } = getPackInfo(product);
+              const displayedSize = selectedPack?.size ?? selectedPack?.label ?? product.size;
+              const displayedPrice = selectedPack?.price ?? product.price;
+              const priceValue = Number(String(displayedPrice).replace(/[^0-9.]/g, '')) || Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+              const marginLeft = index === 0 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
+              const marginRight = index === totalItems - 1 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
+              
+              return (
+                <View
+                  key={`offer-${product.id}`}
+                  style={[
+                    styles.productCard,
+                    { width: HORIZONTAL_CARD_WIDTH, marginLeft, marginRight },
+                  ]}
+                >
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>{product.discount}</Text>
                   </View>
-                ) : null}
-                <TouchableOpacity 
-                  style={styles.productImage}
-                  onPress={() => setZoomedImage(getProductImageSource(product))}
-                >
-                  {getProductImageSource(product) ? (
-                    <Image source={getProductImageSource(product)} style={styles.productImageTag} />
-                  ) : (
-                    <Text style={styles.productEmoji}>📦</Text>
-                  )}
-                </TouchableOpacity>
-                <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                <Text style={styles.productBrand}>{product.brand}</Text>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.currentPrice}>{product.price}</Text>
-                  <Text style={styles.originalPrice}>{product.originalPrice}</Text>
-                </View>
-                {product.saved ? (
+                  <TouchableOpacity 
+                    style={styles.productImage}
+                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                  >
+                    {getProductImageSource(product) ? (
+                      <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                    ) : (
+                      <Text style={styles.productEmoji}>📦</Text>
+                    )}
+                  </TouchableOpacity>
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {product.name}
+                  </Text>
+                  <Text style={styles.productBrand}>{product.brand}</Text>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                    <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                  </View>
                   <View style={styles.savedContainer}>
                     <Text style={styles.savedIcon}>💚</Text>
                     <Text style={styles.savedText}>Saved Price {product.saved}</Text>
                   </View>
-                ) : null}
-                {product.size ? (
-                  <Text style={styles.productSize}>Size {product.size}</Text>
-                ) : null}
-                {cartItems.find((it) => it.id === product.id) ? (
-                  <View style={styles.qtyControls}>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(product.id)}>
-                      <Text style={styles.qtyBtnText}>-</Text>
+                  {packOptions.length > 0 ? (
+                    <TouchableOpacity 
+                      style={styles.sizeDropdown}
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        setSizePickerProductId(product.id);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                      <Ionicons name="chevron-down" size={16} color="#666666" />
                     </TouchableOpacity>
-                    <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(product.id)}>
-                      <Text style={styles.qtyBtnText}>+</Text>
+                  ) : (
+                    displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
+                  )}
+                  {cartItems.find((it) => it.id === product.id) ? (
+                    <View style={styles.qtyControls}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
+                        <Text style={styles.qtyBtnText}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); increment(product.id); }}>
+                        <Text style={styles.qtyBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.addToCartButton} 
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        addToCart({
+                          id: product.id,
+                          name: product.name,
+                          brand: product.brand,
+                          priceValue: priceValue,
+                          image: product.image || product.imageUri,
+                          pack: displayedSize,
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.addToCartText}>Add to Cart</Text>
                     </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Best Selling Products */}
+        <View 
+          ref={bestSellingSectionRef}
+          style={styles.sectionContainer}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            setSectionPositions((prev) => ({ ...prev, bestSelling: y }));
+          }}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{t('bestSelling')}</Text>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'best', baseProducts: bestSellingProducts })}>
+              <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 4 }}
+          >
+              {filteredBestSelling.map((product, index) => {
+                const totalItems = filteredBestSelling.length;
+                const { packOptions, selectedPack } = getPackInfo(product);
+                const displayedSize = selectedPack?.size ?? selectedPack?.label ?? product.size;
+                const displayedPrice = selectedPack?.price ?? product.price;
+                const priceValue = Number(String(displayedPrice).replace(/[^0-9.]/g, '')) || Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+                const marginLeft = index === 0 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
+                const marginRight = index === totalItems - 1 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
+                
+                return (
+                  <View
+                    key={`best-${product.id}`}
+                    style={[
+                      styles.productCard,
+                      { width: HORIZONTAL_CARD_WIDTH, marginLeft, marginRight },
+                    ]}
+                  >
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>{product.discount}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.productImage}
+                      onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                    >
+                      {getProductImageSource(product) ? (
+                        <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                      ) : (
+                        <Text style={styles.productEmoji}>📦</Text>
+                      )}
+                    </TouchableOpacity>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {product.name}
+                    </Text>
+                    <Text style={styles.productBrand}>{product.brand}</Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                      <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                    </View>
+                    <View style={styles.savedContainer}>
+                      <Text style={styles.savedIcon}>💚</Text>
+                      <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                    </View>
+                    {packOptions.length > 0 ? (
+                      <TouchableOpacity 
+                        style={styles.sizeDropdown}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          setSizePickerProductId(product.id);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                        <Ionicons name="chevron-down" size={16} color="#666666" />
+                      </TouchableOpacity>
+                    ) : (
+                      displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
+                    )}
+                    {cartItems.find((it) => it.id === product.id) ? (
+                      <View style={styles.qtyControls}>
+                        <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
+                          <Text style={styles.qtyBtnText}>-</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
+                        <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); increment(product.id); }}>
+                          <Text style={styles.qtyBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.addToCartButton} 
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          addToCart({
+                            id: product.id,
+                            name: product.name,
+                            brand: product.brand,
+                            priceValue: priceValue,
+                            image: product.image || product.imageUri,
+                            pack: displayedSize,
+                          });
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.addToCartText}>Add to Cart</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                ) : (
-                  <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart({
-                    id: product.id,
-                    name: product.name,
-                    brand: product.brand,
-                    priceValue: Number(String(product.price).replace(/[^0-9.]/g, '')) || 0,
-                    image: product.image || product.imageUri,
-                  })}>
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
+                );
+              })}
+          </ScrollView>
+        </View>
+
+        {/* Products - All (grid 2 per row) */}
+        <View 
+          ref={productsSectionRef}
+          style={styles.sectionContainer}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            setSectionPositions((prev) => ({ ...prev, products: y }));
+          }}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Products</Text>
+          </View>
+          <View style={styles.productsGrid}>
+            {filteredProducts.map((product, idx) => {
+              const { packOptions, selectedPack } = getPackInfo(product);
+              const displayedSize = selectedPack?.size ?? selectedPack?.label ?? product.size;
+              const displayedPrice = selectedPack?.price ?? product.price;
+              const priceValue = Number(String(displayedPrice).replace(/[^0-9.]/g, '')) || Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
+              
+              return (
+                <View key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]}>
+                  {product.discount ? (
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>{product.discount}</Text>
+                    </View>
+                  ) : null}
+                  <TouchableOpacity 
+                    style={styles.productImage}
+                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                  >
+                    {getProductImageSource(product) ? (
+                      <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                    ) : (
+                      <Text style={styles.productEmoji}>📦</Text>
+                    )}
                   </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            ))}
+                  <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                  <Text style={styles.productBrand}>{product.brand}</Text>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                    <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                  </View>
+                  {product.saved ? (
+                    <View style={styles.savedContainer}>
+                      <Text style={styles.savedIcon}>💚</Text>
+                      <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                    </View>
+                  ) : null}
+                  {packOptions.length > 0 ? (
+                    <TouchableOpacity 
+                      style={styles.sizeDropdown}
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        setSizePickerProductId(product.id);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                      <Ionicons name="chevron-down" size={16} color="#666666" />
+                    </TouchableOpacity>
+                  ) : (
+                    displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
+                  )}
+                  {cartItems.find((it) => it.id === product.id) ? (
+                    <View style={styles.qtyControls}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
+                        <Text style={styles.qtyBtnText}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{cartItems.find((it) => it.id === product.id)?.quantity || 0}</Text>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); increment(product.id); }}>
+                        <Text style={styles.qtyBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.addToCartButton} 
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        addToCart({
+                          id: product.id,
+                          name: product.name,
+                          brand: product.brand,
+                          priceValue: priceValue,
+                          image: product.image || product.imageUri,
+                          pack: displayedSize,
+                        });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.addToCartText}>Add to Cart</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
+
+      {/* Notifications Modal */}
+      <Modal
+        visible={isNotificationsVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsNotificationsVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.notificationsOverlay}
+          activeOpacity={1}
+          onPress={() => setIsNotificationsVisible(false)}
+        >
+          <View
+            style={[
+              styles.notificationsSheet,
+              { paddingBottom: 24 + (insets?.bottom || 0) },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.notificationsHeader}>
+              <Text style={styles.notificationsTitle}>
+                {t('notificationsTitle') || 'Notifications'}
+              </Text>
+              <View style={styles.notificationsHeaderActions}>
+                <TouchableOpacity
+                  style={styles.notificationsCloseButton}
+                  onPress={() => setIsNotificationsVisible(false)}
+                >
+                  <Ionicons name="close" size={22} color="#1F2937" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            {notificationsLoading ? (
+              <View style={styles.notificationsLoader}>
+                <ActivityIndicator size="small" color="#2E7D32" />
+              </View>
+            ) : notifications.length === 0 ? (
+              <View style={styles.notificationsEmptyContainer}>
+                <Text style={styles.notificationsEmptyEmoji}>🔔</Text>
+                <Text style={styles.notificationsEmptyTitle}>
+                  {t('notificationsEmptyTitle') || 'No alerts yet'}
+                </Text>
+                <Text style={styles.notificationsEmptyText}>
+                  {t('notificationsEmptyMessage') ||
+                    "We'll notify you when something new arrives."}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={notifications}
+                keyExtractor={notificationKeyExtractor}
+                renderItem={renderNotificationItem}
+                showsVerticalScrollIndicator={false}
+                ItemSeparatorComponent={() => (
+                  <View style={styles.notificationSeparator} />
+                )}
+                contentContainerStyle={styles.notificationsList}
+              />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Size Picker Modal */}
+      <Modal
+        visible={sizePickerProductId !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSizePickerProductId(null)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSizePickerProductId(null)}
+        >
+          <View 
+            style={styles.sizePickerModalContent}
+            onStartShouldSetResponder={() => true}
+          >
+            {(() => {
+              const product = allProducts.find(p => p.id === sizePickerProductId);
+              if (!product) return null;
+              const packOptions = resolvePackOptions(product);
+              const selectedIdx = typeof selectedPackById[product.id] === 'number' 
+                ? selectedPackById[product.id] 
+                : 0;
+              
+              return (
+                <>
+                  <View style={styles.sizePickerHeader}>
+                    <Text style={styles.sizePickerTitle}>Select Size</Text>
+                    <TouchableOpacity 
+                      onPress={() => setSizePickerProductId(null)}
+                      style={styles.sizePickerCloseBtn}
+                    >
+                      <Ionicons name="close" size={24} color="#666666" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.sizePickerOptions}>
+                    {packOptions.map((opt, idx) => {
+                      const isSelected = selectedIdx === idx;
+                      const sizeText = opt.label || opt.size || '';
+                      const isLast = idx === packOptions.length - 1;
+                      return (
+                        <TouchableOpacity
+                          key={`size-${idx}`}
+                          style={[styles.sizePickerOption, isSelected && styles.sizePickerOptionSelected, isLast && { marginBottom: 0 }]}
+                          onPress={() => {
+                            setSelectedPackById((prev) => ({ ...prev, [product.id]: idx }));
+                            setSizePickerProductId(null);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.sizePickerOptionText, isSelected && styles.sizePickerOptionTextSelected]}>
+                            {sizeText}
+                          </Text>
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Image Zoom Modal */}
       <Modal
@@ -1529,10 +1793,29 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
   },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFB020',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   searchContainer: {
     marginTop: 8,
-    position: 'relative',
-    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchDropdown: {
     position: 'absolute',
@@ -1555,21 +1838,31 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     zIndex: 3000,
   },
+  searchDropdownBox: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    marginTop: 0,
+    overflow: 'hidden',
+    zIndex: 3000,
+  },
   dropdownScrollView: {
     flex: 1,
-    paddingBottom: 8,
+    paddingTop: 16,
   },
   dropdownSection: {
-    paddingVertical: 14,
+    paddingVertical: 20,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomWidth: 0,
   },
   dropdownSectionTitleBold: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 12,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
   },
   horizontalScrollContent: {
     paddingRight: 16,
@@ -1673,6 +1966,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    flex: 1,
   },
   searchIcon: {
     fontSize: 16,
@@ -1700,7 +1994,7 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginLeft: 12,
   },
   micButtonActive: {
     backgroundColor: '#EF4444',
@@ -1931,8 +2225,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
-    marginLeft: 16,
-    marginRight: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -2015,6 +2307,85 @@ const styles = StyleSheet.create({
   productSize: {
     fontSize: 12,
     color: '#666666',
+  },
+  sizeDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 4,
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  sizeDropdownText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sizePickerModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '80%',
+    maxWidth: 400,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  sizePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sizePickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  sizePickerCloseBtn: {
+    padding: 4,
+  },
+  sizePickerOptions: {
+    // gap not supported in React Native, use marginBottom on children instead
+  },
+  sizePickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 10,
+  },
+  sizePickerOptionSelected: {
+    backgroundColor: '#2E7D32',
+    borderColor: '#2E7D32',
+  },
+  sizePickerOptionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  sizePickerOptionTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   imageBannerContainer: {
     paddingHorizontal: 16,
@@ -2187,5 +2558,123 @@ const styles = StyleSheet.create({
   fabIcon: {
     fontSize: 24,
     color: '#FFFFFF',
+  },
+  notificationsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  notificationsSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  notificationsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  notificationsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  notificationsHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notificationsCloseButton: {
+    padding: 6,
+  },
+  notificationsLoader: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationsEmptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 12,
+  },
+  notificationsEmptyEmoji: {
+    fontSize: 32,
+    marginBottom: 12,
+  },
+  notificationsEmptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  notificationsEmptyText: {
+    fontSize: 13,
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 12,
+  },
+  notificationsList: {
+    paddingBottom: 12,
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+  },
+  notificationItemUnread: {
+    backgroundColor: '#ECFDF3',
+  },
+  notificationIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationIconUnread: {
+    backgroundColor: '#BBF7D0',
+  },
+  notificationContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  notificationTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  notificationBody: {
+    fontSize: 13,
+    color: '#475569',
+    marginBottom: 6,
+  },
+  notificationTime: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  notificationUnreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#1E7C31',
+    marginLeft: 8,
+  },
+  notificationSeparator: {
+    height: 12,
   },
 });
