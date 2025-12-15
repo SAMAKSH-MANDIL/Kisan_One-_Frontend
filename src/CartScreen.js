@@ -1,79 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from './CartContext';
-import { useOrders } from './OrdersContext';
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
+import { getProductImageSource, getProductForNavigation } from './utils/products';
 
 export default function CartScreen() {
   const navigation = useNavigation();
   const { items, increment, decrement, totalAmount, clearCart } = useCart();
-  const { addOrder } = useOrders();
   const insets = useSafeAreaInsets();
 
-  const checkUserAddress = async () => {
-    try {
-      const user = auth().currentUser;
-      if (!user) {
-        return false;
-      }
-      const doc = await firestore().collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        const data = doc.data() || {};
-        // Check if all address fields are present and not empty
-        if (data.name && data.state && data.city && data.address) {
-          return true;
-        }
-      }
-      return false;
-    } catch (error) {
-      console.log('Address check error:', error);
-      return false;
-    }
-  };
-
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = () => {
     if (items.length === 0) {
       Alert.alert('Cart empty', 'Add some products first.');
       return;
     }
 
-    // Check if user has saved address
-    const hasAddress = await checkUserAddress();
-    if (!hasAddress) {
-      Alert.alert(
-        'Address Required',
-        'Please save your full address before placing an order.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Go to Profile',
-            onPress: () => navigation.navigate('MyProfile'),
-          },
-        ]
-      );
-      return;
-    }
-
-    const now = new Date();
-    const orderNumber = `ORD-${now.getTime()}`;
-    const total = totalAmount.toFixed(2);
-    const order = {
-      id: orderNumber,
-      orderNumber,
-      date: now.toISOString().slice(0,10),
-      status: 'Pending',
-      total: `₹${total}`,
-      items: items.reduce((s,i)=>s+i.quantity,0),
-      products: items.map((i)=>({ name: i.name, quantity: i.quantity, price: `₹${(i.priceValue*i.quantity).toFixed(2)}` })),
-    };
-    addOrder(order);
-    Alert.alert('Order placed', 'Thank you! Your order has been placed.', [
-      { text: 'OK', onPress: () => { clearCart(); navigation.navigate('Dashboard', { screen: 'MyOrders' }); } },
-    ]);
+    // Navigate to CheckoutScreen
+    navigation.navigate('Checkout');
   };
 
   return (
@@ -93,25 +38,50 @@ export default function CartScreen() {
           <Text style={styles.emptyText}>Your cart is empty.</Text>
         ) : (
           items.map((it) => (
-            <View key={it.id} style={styles.itemCard}>
+            <TouchableOpacity 
+              key={it.id} 
+              style={styles.itemCard}
+              onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(it) })}
+              activeOpacity={0.7}
+            >
               <View style={styles.itemLeft}>
-                <View style={styles.itemThumb}><Text style={{ fontSize: 18 }}>{it.image || '🛒'}</Text></View>
+                <View style={styles.itemThumb}>
+                  {getProductImageSource(it) ? (
+                    <Image 
+                      source={getProductImageSource(it)} 
+                      style={styles.itemImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 18 }}>🛒</Text>
+                  )}
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemName} numberOfLines={1}>{it.name}</Text>
                   <Text style={styles.itemBrand}>{it.brand}</Text>
                   <Text style={styles.itemPrice}>₹{it.priceValue?.toFixed(2) || it.price?.replace('₹','') || '0'}</Text>
                 </View>
               </View>
-              <View style={styles.qtyRow}>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => decrement(it.id)}>
+              <View 
+                style={styles.qtyRow}
+                onStartShouldSetResponder={() => true}
+                onResponderTerminationRequest={() => false}
+              >
+                <TouchableOpacity 
+                  style={styles.qtyBtn} 
+                  onPress={() => decrement(it.id)}
+                >
                   <Text style={styles.qtyBtnText}>-</Text>
                 </TouchableOpacity>
                 <Text style={styles.qtyText}>{it.quantity}</Text>
-                <TouchableOpacity style={styles.qtyBtn} onPress={() => increment(it.id)}>
+                <TouchableOpacity 
+                  style={styles.qtyBtn} 
+                  onPress={() => increment(it.id)}
+                >
                   <Text style={styles.qtyBtnText}>+</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
@@ -162,7 +132,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   itemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
-  itemThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  itemThumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: 10, overflow: 'hidden' },
+  itemImage: { width: '100%', height: '100%' },
   itemName: { fontSize: 14, fontWeight: '700', color: '#111827' },
   itemBrand: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   itemPrice: { fontSize: 14, color: '#2E7D32', fontWeight: '700', marginTop: 4 },

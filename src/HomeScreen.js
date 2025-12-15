@@ -1089,53 +1089,54 @@ export default function HomeScreen() {
               const marginRight = index === totalItems - 1 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
               
               return (
-                <View
+                <TouchableOpacity
                   key={product.id}
                   style={[
                     styles.productCard,
                     { width: HORIZONTAL_CARD_WIDTH, marginLeft, marginRight },
                   ]}
+                  onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                  activeOpacity={0.9}
                 >
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>{product.discount}</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.productImage}
-                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
-                  >
-                    {getProductImageSource(product) ? (
-                      <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                  <View style={styles.productCardContent}>
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>{product.discount}</Text>
+                    </View>
+                    <View style={styles.productImage}>
+                      {getProductImageSource(product) ? (
+                        <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                      ) : (
+                        <Text style={styles.productEmoji}>📦</Text>
+                      )}
+                    </View>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {product.name}
+                    </Text>
+                    <Text style={styles.productBrand}>{product.brand}</Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                      <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                    </View>
+                    <View style={styles.savedContainer}>
+                      <Text style={styles.savedIcon}>💚</Text>
+                      <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                    </View>
+                    {packOptions.length > 0 ? (
+                      <TouchableOpacity 
+                        style={styles.sizeDropdown}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          setSizePickerProductId(product.id);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                        <Ionicons name="chevron-down" size={16} color="#666666" />
+                      </TouchableOpacity>
                     ) : (
-                      <Text style={styles.productEmoji}>📦</Text>
+                      displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
                     )}
-                  </TouchableOpacity>
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {product.name}
-                  </Text>
-                  <Text style={styles.productBrand}>{product.brand}</Text>
-                  <View style={styles.priceContainer}>
-                    <Text style={styles.currentPrice}>{displayedPrice}</Text>
-                    <Text style={styles.originalPrice}>{product.originalPrice}</Text>
                   </View>
-                  <View style={styles.savedContainer}>
-                    <Text style={styles.savedIcon}>💚</Text>
-                    <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                  </View>
-                  {packOptions.length > 0 ? (
-                    <TouchableOpacity 
-                      style={styles.sizeDropdown}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        setSizePickerProductId(product.id);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
-                      <Ionicons name="chevron-down" size={16} color="#666666" />
-                    </TouchableOpacity>
-                  ) : (
-                    displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
-                  )}
                   {cartItems.find((it) => it.id === product.id) ? (
                     <View style={styles.qtyControls}>
                       <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
@@ -1165,7 +1166,7 @@ export default function HomeScreen() {
                       <Text style={styles.addToCartText}>Add to Cart</Text>
                     </TouchableOpacity>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -1202,53 +1203,54 @@ export default function HomeScreen() {
               const marginRight = index === totalItems - 1 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
               
               return (
-                <View
+                <TouchableOpacity
                   key={`offer-${product.id}`}
                   style={[
                     styles.productCard,
                     { width: HORIZONTAL_CARD_WIDTH, marginLeft, marginRight },
                   ]}
+                  onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                  activeOpacity={0.9}
                 >
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>{product.discount}</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.productImage}
-                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
-                  >
-                    {getProductImageSource(product) ? (
-                      <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                  <View style={styles.productCardContent}>
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>{product.discount}</Text>
+                    </View>
+                    <View style={styles.productImage}>
+                      {getProductImageSource(product) ? (
+                        <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                      ) : (
+                        <Text style={styles.productEmoji}>📦</Text>
+                      )}
+                    </View>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {product.name}
+                    </Text>
+                    <Text style={styles.productBrand}>{product.brand}</Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                      <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                    </View>
+                    <View style={styles.savedContainer}>
+                      <Text style={styles.savedIcon}>💚</Text>
+                      <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                    </View>
+                    {packOptions.length > 0 ? (
+                      <TouchableOpacity 
+                        style={styles.sizeDropdown}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          setSizePickerProductId(product.id);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                        <Ionicons name="chevron-down" size={16} color="#666666" />
+                      </TouchableOpacity>
                     ) : (
-                      <Text style={styles.productEmoji}>📦</Text>
+                      displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
                     )}
-                  </TouchableOpacity>
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {product.name}
-                  </Text>
-                  <Text style={styles.productBrand}>{product.brand}</Text>
-                  <View style={styles.priceContainer}>
-                    <Text style={styles.currentPrice}>{displayedPrice}</Text>
-                    <Text style={styles.originalPrice}>{product.originalPrice}</Text>
                   </View>
-                  <View style={styles.savedContainer}>
-                    <Text style={styles.savedIcon}>💚</Text>
-                    <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                  </View>
-                  {packOptions.length > 0 ? (
-                    <TouchableOpacity 
-                      style={styles.sizeDropdown}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        setSizePickerProductId(product.id);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
-                      <Ionicons name="chevron-down" size={16} color="#666666" />
-                    </TouchableOpacity>
-                  ) : (
-                    displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
-                  )}
                   {cartItems.find((it) => it.id === product.id) ? (
                     <View style={styles.qtyControls}>
                       <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
@@ -1278,7 +1280,7 @@ export default function HomeScreen() {
                       <Text style={styles.addToCartText}>Add to Cart</Text>
                     </TouchableOpacity>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -1315,53 +1317,54 @@ export default function HomeScreen() {
                 const marginRight = index === totalItems - 1 ? HORIZONTAL_SCREEN_PADDING : HORIZONTAL_CARD_GAP / 2;
                 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={`best-${product.id}`}
                     style={[
                       styles.productCard,
                       { width: HORIZONTAL_CARD_WIDTH, marginLeft, marginRight },
                     ]}
+                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                    activeOpacity={0.9}
                   >
-                    <View style={styles.discountBadge}>
-                      <Text style={styles.discountText}>{product.discount}</Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.productImage}
-                      onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
-                    >
-                      {getProductImageSource(product) ? (
-                        <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                    <View style={styles.productCardContent}>
+                      <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>{product.discount}</Text>
+                      </View>
+                      <View style={styles.productImage}>
+                        {getProductImageSource(product) ? (
+                          <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                        ) : (
+                          <Text style={styles.productEmoji}>📦</Text>
+                        )}
+                      </View>
+                      <Text style={styles.productName} numberOfLines={2}>
+                        {product.name}
+                      </Text>
+                      <Text style={styles.productBrand}>{product.brand}</Text>
+                      <View style={styles.priceContainer}>
+                        <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                        <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                      </View>
+                      <View style={styles.savedContainer}>
+                        <Text style={styles.savedIcon}>💚</Text>
+                        <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                      </View>
+                      {packOptions.length > 0 ? (
+                        <TouchableOpacity 
+                          style={styles.sizeDropdown}
+                          onPress={(e) => {
+                            e?.stopPropagation?.();
+                            setSizePickerProductId(product.id);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                          <Ionicons name="chevron-down" size={16} color="#666666" />
+                        </TouchableOpacity>
                       ) : (
-                        <Text style={styles.productEmoji}>📦</Text>
+                        displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
                       )}
-                    </TouchableOpacity>
-                    <Text style={styles.productName} numberOfLines={2}>
-                      {product.name}
-                    </Text>
-                    <Text style={styles.productBrand}>{product.brand}</Text>
-                    <View style={styles.priceContainer}>
-                      <Text style={styles.currentPrice}>{displayedPrice}</Text>
-                      <Text style={styles.originalPrice}>{product.originalPrice}</Text>
                     </View>
-                    <View style={styles.savedContainer}>
-                      <Text style={styles.savedIcon}>💚</Text>
-                      <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                    </View>
-                    {packOptions.length > 0 ? (
-                      <TouchableOpacity 
-                        style={styles.sizeDropdown}
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          setSizePickerProductId(product.id);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
-                        <Ionicons name="chevron-down" size={16} color="#666666" />
-                      </TouchableOpacity>
-                    ) : (
-                      displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
-                    )}
                     {cartItems.find((it) => it.id === product.id) ? (
                       <View style={styles.qtyControls}>
                         <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
@@ -1391,7 +1394,7 @@ export default function HomeScreen() {
                         <Text style={styles.addToCartText}>Add to Cart</Text>
                       </TouchableOpacity>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
           </ScrollView>
@@ -1417,49 +1420,53 @@ export default function HomeScreen() {
               const priceValue = Number(String(displayedPrice).replace(/[^0-9.]/g, '')) || Number(String(product.price).replace(/[^0-9.]/g, '')) || 0;
               
               return (
-                <View key={`all-${idx}-${product.id}`} style={[styles.productCard, styles.productCardGridOverride]}>
-                  {product.discount ? (
-                    <View style={styles.discountBadge}>
-                      <Text style={styles.discountText}>{product.discount}</Text>
+                <TouchableOpacity 
+                  key={`all-${idx}-${product.id}`} 
+                  style={[styles.productCard, styles.productCardGridOverride]}
+                  onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
+                  activeOpacity={0.9}
+                >
+                  <View style={styles.productCardContent}>
+                    {product.discount ? (
+                      <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>{product.discount}</Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.productImage}>
+                      {getProductImageSource(product) ? (
+                        <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                      ) : (
+                        <Text style={styles.productEmoji}>📦</Text>
+                      )}
                     </View>
-                  ) : null}
-                  <TouchableOpacity 
-                    style={styles.productImage}
-                    onPress={() => navigation.navigate('ProductDetail', { product: getProductForNavigation(product) })}
-                  >
-                    {getProductImageSource(product) ? (
-                      <Image source={getProductImageSource(product)} style={styles.productImageTag} />
+                    <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                    <Text style={styles.productBrand}>{product.brand}</Text>
+                    <View style={styles.priceContainer}>
+                      <Text style={styles.currentPrice}>{displayedPrice}</Text>
+                      <Text style={styles.originalPrice}>{product.originalPrice}</Text>
+                    </View>
+                    {product.saved ? (
+                      <View style={styles.savedContainer}>
+                        <Text style={styles.savedIcon}>💚</Text>
+                        <Text style={styles.savedText}>Saved Price {product.saved}</Text>
+                      </View>
+                    ) : null}
+                    {packOptions.length > 0 ? (
+                      <TouchableOpacity 
+                        style={styles.sizeDropdown}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          setSizePickerProductId(product.id);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
+                        <Ionicons name="chevron-down" size={16} color="#666666" />
+                      </TouchableOpacity>
                     ) : (
-                      <Text style={styles.productEmoji}>📦</Text>
+                      displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
                     )}
-                  </TouchableOpacity>
-                  <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                  <Text style={styles.productBrand}>{product.brand}</Text>
-                  <View style={styles.priceContainer}>
-                    <Text style={styles.currentPrice}>{displayedPrice}</Text>
-                    <Text style={styles.originalPrice}>{product.originalPrice}</Text>
                   </View>
-                  {product.saved ? (
-                    <View style={styles.savedContainer}>
-                      <Text style={styles.savedIcon}>💚</Text>
-                      <Text style={styles.savedText}>Saved Price {product.saved}</Text>
-                    </View>
-                  ) : null}
-                  {packOptions.length > 0 ? (
-                    <TouchableOpacity 
-                      style={styles.sizeDropdown}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        setSizePickerProductId(product.id);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.sizeDropdownText}>Size: {displayedSize}</Text>
-                      <Ionicons name="chevron-down" size={16} color="#666666" />
-                    </TouchableOpacity>
-                  ) : (
-                    displayedSize ? <Text style={styles.productSize}>Size {displayedSize}</Text> : null
-                  )}
                   {cartItems.find((it) => it.id === product.id) ? (
                     <View style={styles.qtyControls}>
                       <TouchableOpacity style={styles.qtyBtn} onPress={(e) => { e?.stopPropagation?.(); decrement(product.id); }}>
@@ -1489,7 +1496,7 @@ export default function HomeScreen() {
                       <Text style={styles.addToCartText}>Add to Cart</Text>
                     </TouchableOpacity>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -2232,6 +2239,11 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  productCardContent: {
+    flex: 1,
   },
   discountBadge: {
     backgroundColor: '#FF6B6B',
@@ -2459,7 +2471,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
-    marginTop: 8,
   },
   productsGrid: {
     paddingHorizontal: 16,
@@ -2483,7 +2494,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
   },
   qtyBtn: {
     width: 28,

@@ -8,10 +8,12 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import { useOrders } from './OrdersContext';
 
 export default function MyOrdersScreen() {
+  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('All');
   const { orders: placedOrders, addOrder } = useOrders();
 
@@ -162,18 +164,19 @@ export default function MyOrdersScreen() {
                 <TouchableOpacity
                   style={[styles.actionButton, styles.secondaryButton]}
                   onPress={() => {
-                    const today = new Date();
-                    const formattedDate = today.toISOString().split('T')[0];
-                    const newOrder = {
-                      id: Date.now().toString(),
-                      orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
-                      date: formattedDate,
-                      status: 'Pending',
-                      total: order.total,
-                      items: order.items,
-                      products: order.products,
-                    };
-                    addOrder(newOrder);
+                    // Convert order products to reorder items format
+                    const reorderItems = (order.products || []).map((product) => ({
+                      id: `reorder-${Date.now()}-${Math.random()}`,
+                      name: product.name,
+                      quantity: product.quantity || 1,
+                      priceValue: parseFloat(product.price?.replace('₹', '').replace(',', '')) || 0,
+                      pack: product.pack || null,
+                      brand: product.brand || null,
+                    }));
+                    
+                    navigation.navigate('Checkout', {
+                      reorderItems: reorderItems,
+                    });
                   }}
                 >
                   <Text style={styles.secondaryButtonText}>Reorder</Text>

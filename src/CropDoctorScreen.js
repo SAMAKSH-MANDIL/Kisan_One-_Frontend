@@ -209,109 +209,199 @@ export default function CropDoctorScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
 
+      {/* Modern Header with Gradient Background */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Crop Doctor</Text>
-        <View style={{ width: 44 }} />
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Ionicons name="medical" size={24} color="#FFFFFF" style={styles.headerIcon} />
+            <Text style={styles.headerTitle}>Crop Doctor</Text>
+          </View>
+          <View style={{ width: 44 }} />
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>AI-Powered Crop Disease Detection</Text>
-        <Text style={styles.subtitle}>
-          Take a photo of your crop leaves and get instant disease
-          diagnosis with treatment recommendations.
-        </Text>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="leaf" size={48} color="#2E7D32" />
+          </View>
+          <Text style={styles.title}>AI-Powered Crop Disease Detection</Text>
+          <Text style={styles.subtitle}>
+            Capture or upload a photo of your crop leaves to get instant AI-powered disease diagnosis with detailed treatment recommendations
+          </Text>
+        </View>
 
-        <Text style={styles.sectionTitle}>Step 1: Capture Image</Text>
-        <View style={styles.row}>
-          <TouchableOpacity style={[styles.cta, styles.cameraBtn]} onPress={openCamera}>
-            <Ionicons name="camera" size={18} color="#FFFFFF" />
-            <Text style={styles.ctaText}>Camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.cta, styles.galleryBtn]} onPress={openGallery}>
-            <Ionicons name="image" size={18} color="#FFFFFF" />
-            <Text style={styles.ctaText}>Gallery</Text>
-          </TouchableOpacity>
+        {/* Image Capture Section */}
+        <View style={styles.captureSection}>
+          <Text style={styles.sectionTitle}>📷 Capture or Select Image</Text>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity 
+              style={[styles.cta, styles.cameraBtn]} 
+              onPress={openCamera}
+              activeOpacity={0.8}
+            >
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="camera" size={24} color="#FFFFFF" />
+              </View>
+              <Text style={styles.ctaText}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.cta, styles.galleryBtn]} 
+              onPress={openGallery}
+              activeOpacity={0.8}
+            >
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="images" size={24} color="#FFFFFF" />
+              </View>
+              <Text style={styles.ctaText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {imageUri ? (
           <>
-            <View style={styles.previewCard}>
-              <Image source={{ uri: imageUri }} style={styles.previewImage} />
+            {/* Image Preview Card */}
+            <View style={styles.previewSection}>
+              <View style={styles.previewCard}>
+                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                <TouchableOpacity 
+                  style={styles.removeImageBtn}
+                  onPress={() => {
+                    setImageUri(null);
+                    setShowReport(false);
+                    setReportData(null);
+                  }}
+                >
+                  <Ionicons name="close-circle" size={28} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Generate Report Button */}
+              <TouchableOpacity 
+                style={[styles.generateReportBtn, isAnalyzing && styles.generateReportBtnDisabled]} 
+                onPress={analyzeImage}
+                disabled={isAnalyzing}
+                activeOpacity={0.8}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.generateReportBtnText}>Analyzing Image...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="analytics" size={22} color="#FFFFFF" />
+                    <Text style={styles.generateReportBtnText}>Analyze & Generate Report</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={[styles.generateReportBtn, isAnalyzing && styles.generateReportBtnDisabled]} 
-              onPress={analyzeImage}
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing ? (
-                <>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.generateReportBtnText}>Analyzing...</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="document-text" size={20} color="#FFFFFF" />
-                  <Text style={styles.generateReportBtnText}>Generate Report</Text>
-                </>
-              )}
-            </TouchableOpacity>
             
             {showReport && reportData && (
               <View style={styles.reportCard}>
+                {/* Report Header with Badge */}
                 <View style={styles.reportHeader}>
-                  <Text style={styles.reportTitle}>Diagnosis Report</Text>
-                  <Ionicons name="medical" size={24} color="#22A06B" />
-                </View>
-                
-                <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Crop Name:</Text>
-                  <Text style={styles.reportValue}>{reportData.crop_name}</Text>
-                </View>
-
-                <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Disease Detected:</Text>
-                  <Text style={styles.reportValue}>{reportData.crop_disease}</Text>
+                  <View style={styles.reportTitleContainer}>
+                    <Ionicons name="document-text" size={28} color="#2E7D32" />
+                    <Text style={styles.reportTitle}>Diagnosis Report</Text>
+                  </View>
+                  <View style={styles.confidenceBadge}>
+                    <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                    <Text style={styles.confidenceBadgeText}>
+                      {formatConfidenceScore(reportData.confidence_score)}
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.reportSection}>
-                  <Text style={styles.reportLabel}>Confidence Score:</Text>
-                  <Text style={styles.reportValue}>{formatConfidenceScore(reportData.confidence_score)}</Text>
+                {/* Key Information Cards */}
+                <View style={styles.infoCardsRow}>
+                  <View style={styles.infoCard}>
+                    <Ionicons name="leaf-outline" size={20} color="#2E7D32" />
+                    <Text style={styles.infoCardLabel}>Crop</Text>
+                    <Text style={styles.infoCardValue} numberOfLines={2}>
+                      {reportData.crop_name}
+                    </Text>
+                  </View>
+                  <View style={styles.infoCard}>
+                    <Ionicons name="warning" size={20} color="#EF4444" />
+                    <Text style={styles.infoCardLabel}>Disease</Text>
+                    <Text style={styles.infoCardValue} numberOfLines={2}>
+                      {reportData.crop_disease}
+                    </Text>
+                  </View>
                 </View>
 
-                {renderListSection('Symptoms', reportData.crop_disease_symptoms)}
-                {renderListSection('Cause', reportData.crop_disease_cause)}
-                {renderListSection('Management', reportData.crop_disease_management)}
-                {renderListSection('Prevention', reportData.crop_disease_prevention)}
-                {renderStepsSection('Management Steps', reportData.crop_disease_management_steps)}
+                {/* Report Sections */}
+                <View style={styles.reportContent}>
+                  {renderListSection('Symptoms', reportData.crop_disease_symptoms)}
+                  {renderListSection('Cause', reportData.crop_disease_cause)}
+                  {renderListSection('Management', reportData.crop_disease_management)}
+                  {renderListSection('Prevention', reportData.crop_disease_prevention)}
+                  {renderStepsSection('Management Steps', reportData.crop_disease_management_steps)}
+                </View>
               </View>
             )}
           </>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Tips for Better Results</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>📸 Photo Guidelines:</Text>
-          <View style={styles.bullets}>
-            <Text style={styles.bullet}>• Take clear, well-lit photos</Text>
-            <Text style={styles.bullet}>• Focus on affected leaves</Text>
-            <Text style={styles.bullet}>• Avoid blurry or dark images</Text>
-            <Text style={styles.bullet}>• Include both healthy and diseased parts</Text>
+        {/* Tips Section */}
+        <View style={styles.tipsSection}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="bulb" size={22} color="#2E7D32" />
+            <Text style={styles.sectionTitle}>Tips for Better Results</Text>
+          </View>
+          <View style={styles.tipsCard}>
+            <View style={styles.tipItem}>
+              <View style={styles.tipIcon}>
+                <Ionicons name="camera-outline" size={20} color="#2E7D32" />
+              </View>
+              <Text style={styles.tipText}>Take clear, well-lit photos</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <View style={styles.tipIcon}>
+                <Ionicons name="eye-outline" size={20} color="#2E7D32" />
+              </View>
+              <Text style={styles.tipText}>Focus on affected leaves</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <View style={styles.tipIcon}>
+                <Ionicons name="flash-off-outline" size={20} color="#2E7D32" />
+              </View>
+              <Text style={styles.tipText}>Avoid blurry or dark images</Text>
+            </View>
+            <View style={styles.tipItem}>
+              <View style={styles.tipIcon}>
+                <Ionicons name="contrast-outline" size={20} color="#2E7D32" />
+              </View>
+              <Text style={styles.tipText}>Include both healthy and diseased parts</Text>
+            </View>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Supported Crops</Text>
-        <View style={styles.chipsWrap}>
-          {['Wheat', 'Rice', 'Maize', 'Cotton', 'Sugarcane', 'Tomato', 'Potato', 'Chili']
-            .map((c) => (
-              <View key={c} style={styles.chip}>
-                <Text style={styles.chipText}>{c}</Text>
-              </View>
-          ))}
+        {/* Supported Crops Section */}
+        <View style={styles.cropsSection}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="apps" size={22} color="#2E7D32" />
+            <Text style={styles.sectionTitle}>Supported Crops</Text>
+          </View>
+          <View style={styles.chipsWrap}>
+            {['Wheat', 'Rice', 'Maize', 'Cotton', 'Sugarcane', 'Tomato', 'Potato', 'Chili']
+              .map((c) => (
+                <View key={c} style={styles.chip}>
+                  <Ionicons name="leaf-outline" size={14} color="#2E7D32" />
+                  <Text style={styles.chipText}>{c}</Text>
+                </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -321,234 +411,312 @@ export default function CropDoctorScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F9FAFB',
   },
   header: {
-    height: 56,
+    backgroundColor: '#2E7D32',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  headerContent: {
+    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginTop: 30,
-
+    paddingHorizontal: 16,
   },
   backBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  content: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 18,
-  },
-  cta: {
+  headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 10,
+  },
+  headerIcon: {
+    marginRight: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingTop: 8,
+  },
+  iconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 10,
+    textAlign: 'center',
+    lineHeight: 32,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 8,
+  },
+  captureSection: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cta: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    minHeight: 110,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   cameraBtn: {
-    backgroundColor: '#22A06B',
+    backgroundColor: '#2E7D32',
   },
   galleryBtn: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#0284C7',
+  },
+  buttonIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ctaText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  card: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 10,
-  },
-  bullets: {
-    gap: 6,
-  },
-  bullet: {
     fontSize: 14,
-    color: '#374151',
-  },
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 40,
-  },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  chipText: {
-    fontSize: 14,
-    color: '#111827',
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  previewSection: {
+    marginBottom: 24,
   },
   previewCard: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 4,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    position: 'relative',
   },
   previewImage: {
     width: '100%',
-    height: 220,
-    borderRadius: 10,
+    height: 280,
+    borderRadius: 12,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   generateReportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#22A06B',
-    paddingVertical: 14,
+    gap: 10,
+    backgroundColor: '#2E7D32',
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 10,
-    marginTop: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 12,
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   generateReportBtnDisabled: {
-    opacity: 0.8,
+    opacity: 0.7,
   },
   generateReportBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   reportCard: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#22A06B',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 16,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   reportHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#E8F5E9',
+  },
+  reportTitleContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    gap: 10,
+    flex: 1,
   },
   reportTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1F2937',
+    flex: 1,
   },
-  reportSection: {
-    marginBottom: 16,
-  },
-  reportRow: {
+  confidenceBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2E7D32',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
   },
-  reportLabel: {
-    fontSize: 14,
+  confidenceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  infoCardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  infoCard: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  infoCardLabel: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',
+    marginTop: 8,
     marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  reportValue: {
-    fontSize: 16,
+  infoCardValue: {
+    fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
-  },
-  reportDescription: {
-    fontSize: 14,
-    color: '#374151',
+    color: '#1F2937',
     lineHeight: 20,
-    marginTop: 4,
+  },
+  reportContent: {
+    marginTop: 8,
+  },
+  reportSection: {
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  reportLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#2E7D32',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   treatmentItem: {
     flexDirection: 'row',
-    marginTop: 8,
-    gap: 8,
+    marginTop: 10,
+    gap: 12,
+    alignItems: 'flex-start',
   },
   treatmentBullet: {
-    fontSize: 16,
-    color: '#22A06B',
+    fontSize: 18,
+    color: '#2E7D32',
     fontWeight: '700',
+    marginTop: 2,
   },
   treatmentText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   stepItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 12,
   },
   stepIndex: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#22A06B',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2E7D32',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -556,12 +724,74 @@ const styles = StyleSheet.create({
   stepIndexText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 12,
+    fontSize: 13,
   },
   stepText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 24,
+  },
+  tipsSection: {
+    marginBottom: 24,
+  },
+  tipsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 16,
+  },
+  tipIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+  },
+  cropsSection: {
+    marginBottom: 20,
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#2E7D32',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  chipText: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '600',
   },
 });

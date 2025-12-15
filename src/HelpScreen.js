@@ -9,7 +9,7 @@ export default function HelpScreen() {
   const faqs = [
     { q: 'How do I update my profile?', a: 'Go to the drawer > My Profile, edit your details, and tap Save.' },
     { q: 'How do I place an order?', a: 'Browse products, add items to cart, and proceed to checkout from My Orders.' },
-    { q: 'How do AI Tools help?', a: 'Use Crop Advisory, Crop Doctor, or Crop Recommendation to get tailored guidance.' },
+    { q: 'How do AI Tools help?', a: 'Use Crop Doctor or Crop Recommendation to get tailored guidance.' },
     { q: 'How can I change app language?', a: 'Open the drawer > Language to select your preferred language.' },
   ];
 

@@ -341,10 +341,6 @@ export default function AIToolsScreen() {
   };
 
   const handleToolPress = (toolName) => {
-    if (toolName === 'Crop Advisory') {
-      navigation.navigate('CropAdvisory');
-      return;
-    }
     if (toolName === 'Crop Doctor') {
       navigation.navigate('CropDoctor');
       return;
@@ -846,20 +842,8 @@ export default function AIToolsScreen() {
 
         {/* Tool Cards */}
         <View style={styles.toolsContainer}>
-          {/* First Row: Crop Advisory and Crop Doctor */}
+          {/* First Row: Crop Doctor and Crop Recommendation (2 in a row) */}
           <View style={styles.toolsRow}>
-            <TouchableOpacity 
-              style={styles.toolCardPill}
-              onPress={() => handleToolPress('Crop Advisory')}
-            >
-              <Image 
-                source={require('../assets/AdvisorOverGreen.png')} 
-                style={styles.toolIconPill}
-                resizeMode="contain"
-              />
-              <Text style={styles.toolNamePill} numberOfLines={1}>Crop Advisory</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity 
               style={styles.toolCardPill}
               onPress={() => handleToolPress('Crop Doctor')}
@@ -871,10 +855,7 @@ export default function AIToolsScreen() {
               />
               <Text style={styles.toolNamePill} numberOfLines={1}>Crop Doctor</Text>
             </TouchableOpacity>
-          </View>
 
-          {/* Second Row: Crop Recommendation and More */}
-          <View style={styles.toolsRow}>
             <TouchableOpacity 
               style={styles.toolCardPill}
               onPress={() => handleToolPress('Crop Recommendation')}
@@ -886,10 +867,13 @@ export default function AIToolsScreen() {
               />
               <Text style={styles.toolNamePill} numberOfLines={1}>Crop Recommendation</Text>
             </TouchableOpacity>
+          </View>
 
-            {!showMoreExpanded && (
+          {/* Second Row: More Button (Centered) */}
+          {!showMoreExpanded && (
+            <View style={styles.toolsRowCentered}>
               <TouchableOpacity 
-                style={styles.toolCardPill}
+                style={styles.moreButton}
                 onPress={() => {
                   try { Keyboard.dismiss(); } catch (_) {}
                   try { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); } catch (_) {}
@@ -898,8 +882,8 @@ export default function AIToolsScreen() {
               >
                 <Text style={styles.toolNamePill} numberOfLines={1}>More</Text>
               </TouchableOpacity>
-            )}
-          </View>
+            </View>
+          )}
 
           {/* Expanded More Options - 4 rows x 2 columns */}
           {showMoreExpanded && (
@@ -1304,6 +1288,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     width: '100%',
   },
+  toolsRowCentered: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+    width: '100%',
+  },
   toolCardPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1337,6 +1327,23 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
     textAlign: 'center',
+  },
+  moreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    minHeight: 56,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   searchContainer: {
     flexDirection: 'row',

@@ -251,65 +251,22 @@ export default function ProductDetailScreen({ route, navigation }) {
     }
   };
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     if (currentStockStatus.count === 0) {
       Alert.alert('Out of Stock', 'This product is currently out of stock.');
       return;
     }
     
-    // Check if user has saved address
-    const hasAddress = await checkUserAddress();
-    if (!hasAddress) {
-      Alert.alert(
-        'Address Required',
-        'Please save your full address before placing an order.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Go to Profile',
-            onPress: () => navigation.navigate('MyProfile'),
-          },
-        ]
-      );
-      return;
-    }
-    
-    // Reduce stock by 1
-    reduceStock(product.id, 1);
-    
-    // Format date
-    const today = new Date();
-    const formattedDate = today.toISOString().split('T')[0];
-    
-    // Generate order number
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-    
-    // Add to orders - match the structure expected by MyOrdersScreen
-    const order = {
-      id: Date.now().toString(),
-      orderNumber: orderNumber,
-      date: formattedDate,
-      status: 'Pending',
-      total: displayedPriceText,
-      items: 1,
-      products: [
-        {
-          name: product.name,
-          quantity: 1,
-          price: displayedPriceText,
-          pack: selectedPack?.label || null,
-        },
-      ],
+    // Navigate to CheckoutScreen with buyNowProduct
+    const buyNowProduct = {
+      ...product,
+      priceValue: selectedPack?.priceValue || product.priceValue || 0,
+      pack: selectedPack?.label || null,
     };
     
-    addOrder(order);
-    
-    // Update local stock display
-    setStock(getStockStatus(product.id));
-    
-    Alert.alert('Order Placed', 'Your order has been placed successfully!', [
-      { text: 'OK', onPress: () => navigation.navigate('Dashboard', { screen: 'My Orders' }) },
-    ]);
+    navigation.navigate('Checkout', {
+      buyNowProduct: buyNowProduct,
+    });
   };
 
   const onImageScroll = (event) => {

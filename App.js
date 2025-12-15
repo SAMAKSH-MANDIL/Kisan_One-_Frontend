@@ -16,7 +16,6 @@ import Login from "./src/Login";
 import Detail from "./src/Detail";
 import HomeScreen from "./src/HomeScreen";
 import AIToolsScreen from "./src/AIToolsScreen";
-import GrowBioScreen from "./src/GrowBioScreen";
 import MyOrdersScreen from "./src/MyOrdersScreen";
 import InfoScreen from "./src/InfoScreen";
 import MyProfileScreen from "./src/MyProfileScreen";
@@ -29,13 +28,16 @@ import { StockProvider } from "./src/StockContext";
 import { LanguageProvider } from "./src/LanguageContext";
 import CropDoctorScreen from "./src/CropDoctorScreen";
 import CropRecommendationScreen from "./src/CropRecommendationScreen";
-import CropAdvisoryScreen from "./src/CropAdvisoryScreen";
 import BrandsViewAllScreen from "./src/BrandsViewAllScreen";
 import BrandDetailScreen from "./src/BrandDetailScreen";
 import ProductsViewAllScreen from "./src/ProductsViewAllScreen";
 import ProductDetailScreen from "./src/ProductDetailScreen";
 import PostDetailScreen from "./src/PostDetailScreen";
 import SchemeDetailScreen from "./src/SchemeDetailScreen";
+import SearchScreen from "./src/SearchScreen";
+import CheckoutScreen from "./src/CheckoutScreen";
+import AddAddressScreen from "./src/AddAddressScreen";
+import FinalReviewScreen from "./src/FinalReviewScreen";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -91,16 +93,6 @@ function MainTabNavigator() {
           tabBarLabel: t('aiTools'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="construct-outline" size={ms(20, 0.4)} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="GrowBio"
-        component={GrowBioScreen}
-        options={{
-          tabBarLabel: t('growBio'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="leaf-outline" size={ms(20, 0.4)} color={color} />
           ),
         }}
       />
@@ -200,11 +192,6 @@ export default function App() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
-          name="CropAdvisory"
-          component={CropAdvisoryScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
           name="BrandsViewAll"
           component={BrandsViewAllScreen}
           options={{ headerShown: false }}
@@ -232,6 +219,26 @@ export default function App() {
         <Stack.Screen
           name="SchemeDetail"
           component={SchemeDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Search"
+          component={SearchScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Checkout"
+          component={CheckoutScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AddAddress"
+          component={AddAddressScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="FinalReview"
+          component={FinalReviewScreen}
           options={{ headerShown: false }}
         />
         
