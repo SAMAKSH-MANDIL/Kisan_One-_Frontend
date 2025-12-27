@@ -35,7 +35,11 @@ export default function CartScreen() {
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 + (insets?.bottom || 0) }]}>
         {items.length === 0 ? (
-          <Text style={styles.emptyText}>Your cart is empty.</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cart-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyText}>Your cart is empty</Text>
+            <Text style={styles.emptySubtext}>Add products to your cart to get started</Text>
+          </View>
         ) : (
           items.map((it) => (
             <TouchableOpacity 
@@ -119,7 +123,26 @@ const styles = StyleSheet.create({
   headerRightBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#F3F4F6' },
   headerRightText: { color: '#EF4444', fontWeight: '700' },
   content: { padding: 16 },
-  emptyText: { textAlign: 'center', color: '#6B7280', paddingTop: 40 },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#111827',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    color: '#6B7280',
+    fontSize: 14,
+  },
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -24,7 +24,7 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import { useCart } from './CartContext';
 import { Ionicons, EvilIcons, MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useLanguage } from './LanguageContext';
 import Voice from '@react-native-voice/voice';
 import { vh, ms } from './utils/responsive';
@@ -104,6 +104,7 @@ export default function HomeScreen() {
     products: 0,
   });
   const isInitialMount = useRef(true);
+  const hasScrolledToTop = useRef(false);
   const {
     notifications,
     unreadCount,
@@ -142,63 +143,121 @@ export default function HomeScreen() {
   useEffect(() => {
     const u = auth().currentUser;
     if (!u) return;
-    const ref = firestore().collection('users').doc(u.uid);
-    const unsub = ref.onSnapshot((doc) => {
-      const d = doc.data() || {};
-      setProfileName((d.name && d.name.trim()) ? d.name : 'Farmer');
-      if (d.recentSearches && Array.isArray(d.recentSearches)) {
-        setRecentSearches(d.recentSearches.slice(0, 10));
-      } else {
-        setRecentSearches([]);
-      }
-    });
-    return () => unsub();
+    
+    try {
+      const ref = firestore().collection('users').doc(u.uid);
+      const unsub = ref.onSnapshot(
+        (doc) => {
+          try {
+            if (!doc || !doc.exists) {
+              setProfileName('Farmer');
+              setRecentSearches([]);
+              return;
+            }
+            const d = doc.data() || {};
+            setProfileName((d.name && d.name.trim()) ? d.name : 'Farmer');
+            if (d.recentSearches && Array.isArray(d.recentSearches)) {
+              setRecentSearches(d.recentSearches.slice(0, 10));
+            } else {
+              setRecentSearches([]);
+            }
+          } catch (error) {
+            console.error('Error processing user data:', error);
+            setProfileName('Farmer');
+            setRecentSearches([]);
+          }
+        },
+        (error) => {
+          console.error('Error loading user profile:', error);
+          setProfileName('Farmer');
+          setRecentSearches([]);
+        }
+      );
+      return () => {
+        try {
+          unsub();
+        } catch (error) {
+          console.error('Error unsubscribing from user profile:', error);
+        }
+      };
+    } catch (error) {
+      console.error('Error setting up user profile listener:', error);
+      setProfileName('Farmer');
+      setRecentSearches([]);
+    }
   }, []);
 
   // Load user orders for recommendations
   const [userOrders, setUserOrders] = useState([]);
   useEffect(() => {
     const u = auth().currentUser;
-    if (!u) return;
+    if (!u) {
+      setUserOrders([]);
+      return;
+    }
     
-    const unsub = firestore()
-      .collection('orders')
-      .where('userId', '==', u.uid)
-      .limit(20)
-      .onSnapshot((snapshot) => {
-        if (!snapshot) {
-          setUserOrders([]);
-          return;
-        }
-        const orders = [];
-        try {
-          snapshot.forEach((doc) => {
-            if (doc && doc.exists) {
-              const data = doc.data();
-              if (data && data.items && Array.isArray(data.items)) {
-                const itemsWithTimestamp = data.items.map(item => ({
-                  ...item,
-                  orderTimestamp: data.createdAt ? data.createdAt.toMillis() : 0,
-                }));
-                orders.push(...itemsWithTimestamp);
+    let unsub = null;
+    try {
+      unsub = firestore()
+        .collection('orders')
+        .where('userId', '==', u.uid)
+        .limit(20)
+        .onSnapshot(
+          (snapshot) => {
+            try {
+              if (!snapshot) {
+                setUserOrders([]);
+                return;
               }
+              const orders = [];
+              snapshot.forEach((doc) => {
+                try {
+                  if (doc && doc.exists) {
+                    const data = doc.data();
+                    if (data && data.items && Array.isArray(data.items)) {
+                      const itemsWithTimestamp = data.items.map(item => ({
+                        ...item,
+                        orderTimestamp: data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : 0) : 0,
+                      }));
+                      orders.push(...itemsWithTimestamp);
+                    }
+                  }
+                } catch (docError) {
+                  console.error('Error processing order document:', docError);
+                }
+              });
+              
+              orders.sort((a, b) => (b.orderTimestamp || 0) - (a.orderTimestamp || 0));
+              setUserOrders(orders.slice(0, 10));
+            } catch (error) {
+              console.error('Error processing orders:', error);
+              setUserOrders([]);
             }
-          });
-          
-          orders.sort((a, b) => (b.orderTimestamp || 0) - (a.orderTimestamp || 0));
-          setUserOrders(orders.slice(0, 10));
-        } catch (error) {
-          console.error('Error processing orders:', error);
-          setUserOrders([]);
+          },
+          (error) => {
+            console.error('Orders query error:', error);
+            if (error.code === 'failed-precondition') {
+              console.log('Firestore index not created. Recommendations will use default products.');
+            } else if (error.code === 'permission-denied') {
+              console.log('Permission denied for orders query. Recommendations will use default products.');
+            }
+            setUserOrders([]);
+          }
+        );
+    } catch (error) {
+      console.error('Error setting up orders listener:', error);
+      setUserOrders([]);
+    }
+    
+    return () => {
+      try {
+        if (unsub) {
+          unsub();
         }
-      }, (error) => {
-        console.error('Orders query error:', error);
-        if (error.code === 'failed-precondition') {
-          console.log('Firestore index not created. Recommendations will use default products.');
-        }
-        setUserOrders([]);
-      });
-    return () => unsub();
+      } catch (error) {
+        console.error('Error unsubscribing from orders:', error);
+      }
+    };
   }, []);
 
   // Back button closes drawer (Android)
@@ -216,20 +275,38 @@ export default function HomeScreen() {
 
   // Voice recognition handlers
   useEffect(() => {
+    let isMounted = true;
+    
     try {
       if (Voice && typeof Voice === 'object') {
-        Voice.onSpeechStart = () => setIsListening(true);
-        Voice.onSpeechEnd = () => setIsListening(false);
-        Voice.onSpeechError = () => {
-          setIsListening(false);
-          Alert.alert('Error', 'Could not process your voice. Please try again.');
+        Voice.onSpeechStart = () => {
+          if (isMounted) setIsListening(true);
+        };
+        Voice.onSpeechEnd = () => {
+          if (isMounted) setIsListening(false);
+        };
+        Voice.onSpeechError = (error) => {
+          if (isMounted) {
+            setIsListening(false);
+            // Only show alert for non-trivial errors
+            if (error?.error?.message !== '7') { // Error 7 is "no match" which is normal
+              console.warn('Voice recognition error:', error);
+            }
+          }
         };
         Voice.onSpeechResults = (e) => {
-          const result = e && e.value && e.value[0];
-          if (result) {
-            openSearchScreen(result, { submitOnOpen: true });
+          if (isMounted) {
+            try {
+              const result = e && e.value && e.value[0];
+              if (result) {
+                openSearchScreen(result, { submitOnOpen: true });
+              }
+              setIsListening(false);
+            } catch (error) {
+              console.error('Error processing voice result:', error);
+              setIsListening(false);
+            }
           }
-          setIsListening(false);
         };
       } else {
         console.warn('Voice module is null. Skipping listener registration. Rebuild may be required.');
@@ -239,13 +316,20 @@ export default function HomeScreen() {
     }
 
     return () => {
+      isMounted = false;
       try {
         if (Voice && typeof Voice.destroy === 'function') {
           Voice.destroy().then(() => {
-            if (typeof Voice.removeAllListeners === 'function') Voice.removeAllListeners();
-          }).catch(() => {});
+            if (typeof Voice.removeAllListeners === 'function') {
+              Voice.removeAllListeners();
+            }
+          }).catch((error) => {
+            console.warn('Error cleaning up voice module:', error);
+          });
         }
-      } catch (_) {}
+      } catch (error) {
+        console.warn('Error in voice cleanup:', error);
+      }
     };
   }, [openSearchScreen]);
 
@@ -672,24 +756,32 @@ export default function HomeScreen() {
       unitType: UNIT_TYPES.UNIT,
     },
   ];
-  const allProducts = [...bestSellingProducts, ...recommendedProducts];
+  // Ensure arrays are defined before combining
+  const safeBestSelling = Array.isArray(bestSellingProducts) ? bestSellingProducts : [];
+  const safeRecommended = Array.isArray(recommendedProducts) ? recommendedProducts : [];
+  const allProducts = [...safeBestSelling, ...safeRecommended];
 
   // Get recommended products based on user orders
-  const getRecommendedFromOrders = () => {
-    if (!userOrders || !Array.isArray(userOrders) || userOrders.length === 0) {
-      return recommendedProducts.slice(0, 3);
-    }
-    
+  const getRecommendedFromOrders = useCallback(() => {
     try {
-      const orderedProductNames = [...new Set(userOrders
+      // Ensure arrays are valid
+      const safeRecommended = Array.isArray(recommendedProducts) ? recommendedProducts : [];
+      const safeAllProducts = Array.isArray(allProducts) ? allProducts : [];
+      const safeUserOrders = Array.isArray(userOrders) ? userOrders : [];
+      
+      if (safeUserOrders.length === 0) {
+        return safeRecommended.slice(0, 3);
+      }
+      
+      const orderedProductNames = [...new Set(safeUserOrders
         .filter(item => item && item.name)
         .map(item => item.name.toLowerCase()))];
       
       if (orderedProductNames.length === 0) {
-        return recommendedProducts.slice(0, 3);
+        return safeRecommended.slice(0, 3);
       }
       
-      const recommended = allProducts.filter(product => {
+      const recommended = safeAllProducts.filter(product => {
         if (!product || !product.name) return false;
         const productName = product.name.toLowerCase();
         return orderedProductNames.some(ordered => 
@@ -698,12 +790,14 @@ export default function HomeScreen() {
         );
       });
       
-      return recommended.length > 0 ? recommended.slice(0, 3) : recommendedProducts.slice(0, 3);
+      return recommended.length > 0 ? recommended.slice(0, 3) : safeRecommended.slice(0, 3);
     } catch (error) {
       console.error('Error getting recommended products:', error);
-      return recommendedProducts.slice(0, 3);
+      // Return safe fallback
+      const safeRecommended = Array.isArray(recommendedProducts) ? recommendedProducts : [];
+      return safeRecommended.slice(0, 3);
     }
-  };
+  }, [recommendedProducts, allProducts, userOrders]);
 
   const trendingProducts = allProducts.slice(0, 20);
 
@@ -724,27 +818,54 @@ export default function HomeScreen() {
   const filteredProducts = filterProducts(allProducts);
   const todaysOfferProducts = filteredRecommended.slice(0, 2);
   
-  // Scroll to first section with products when category changes
+  // Reset scroll to top when screen is focused (when user navigates to Home tab)
+  useFocusEffect(
+    useCallback(() => {
+      // Reset scroll to top when screen comes into focus
+      const timer = setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            y: 0,
+            animated: false, // Instant scroll to top
+          });
+          hasScrolledToTop.current = true;
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }, [])
+  );
+
+  // Ensure scroll starts at top on initial mount
   useEffect(() => {
-    // Skip on initial mount
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      // Reset scroll to top on initial mount
+      const timer = setTimeout(() => {
+        if (scrollViewRef.current && !hasScrolledToTop.current) {
+          scrollViewRef.current.scrollTo({
+            y: 0,
+            animated: false,
+          });
+          hasScrolledToTop.current = true;
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Scroll to first section with products when category changes (but not on initial mount or when "All" is selected)
+  useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current || !hasScrolledToTop.current) {
       return;
     }
     
     if (!scrollViewRef.current) return;
     
-    // If "All" is selected, scroll to top or first section
+    // Don't auto-scroll when "All" is selected - keep user at their current position or top
     if (selectedCategory === 'All') {
-      const timer = setTimeout(() => {
-        if (sectionPositions.recommended > 0) {
-          scrollViewRef.current?.scrollTo({
-            y: sectionPositions.recommended - 20,
-            animated: true,
-          });
-        }
-      }, 100);
-      return () => clearTimeout(timer);
+      return;
     }
     
     // Small delay to ensure layout is complete
@@ -773,16 +894,247 @@ export default function HomeScreen() {
     return () => clearTimeout(timer);
   }, [selectedCategory, sectionPositions, filteredRecommended.length, todaysOfferProducts.length, filteredBestSelling.length, filteredProducts.length]);
 
+  // Helper function to sanitize products for navigation (remove non-serializable properties)
+  const sanitizeProductForNavigation = useCallback((product) => {
+    if (!product || typeof product !== 'object') return null;
+    try {
+      // Helper to check if a value is serializable
+      const isSerializable = (value) => {
+        if (value === null || value === undefined) return true;
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return true;
+        if (Array.isArray(value)) return value.every(isSerializable);
+        if (typeof value === 'object') {
+          try {
+            JSON.stringify(value);
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      };
+
+      // Helper to sanitize a value
+      const sanitizeValue = (value) => {
+        if (value === null || value === undefined) return undefined;
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+        if (Array.isArray(value)) {
+          return value.map(sanitizeValue).filter(v => v !== undefined);
+        }
+        if (typeof value === 'object') {
+          const sanitized = {};
+          for (const key in value) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+              const sanitizedVal = sanitizeValue(value[key]);
+              if (sanitizedVal !== undefined && isSerializable(sanitizedVal)) {
+                sanitized[key] = sanitizedVal;
+              }
+            }
+          }
+          return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+        }
+        return undefined;
+      };
+
+      // Create a clean copy without imageRequire (which can't be serialized)
+      // Only include primitive values and serializable data structures
+      const sanitized = {
+        id: typeof product.id !== 'undefined' ? String(product.id) : undefined,
+        name: typeof product.name === 'string' ? product.name : '',
+        brand: typeof product.brand === 'string' ? product.brand : undefined,
+        price: typeof product.price !== 'undefined' ? (typeof product.price === 'number' ? product.price : String(product.price)) : undefined,
+        originalPrice: typeof product.originalPrice !== 'undefined' ? (typeof product.originalPrice === 'number' ? product.originalPrice : String(product.originalPrice)) : undefined,
+        discount: typeof product.discount !== 'undefined' ? (typeof product.discount === 'number' ? product.discount : String(product.discount)) : undefined,
+        size: typeof product.size === 'string' ? product.size : undefined,
+        saved: typeof product.saved === 'boolean' ? product.saved : undefined,
+        badge: typeof product.badge === 'string' ? product.badge : undefined,
+        category: typeof product.category === 'string' ? product.category : undefined,
+        unitType: typeof product.unitType === 'string' ? product.unitType : undefined,
+        // Only include imageUri/image (strings), not imageRequire (require() result)
+        imageUri: typeof product.imageUri === 'string' ? product.imageUri : (typeof product.image === 'string' ? product.image : undefined),
+      };
+
+      // Sanitize packOptions and packs arrays
+      if (Array.isArray(product.packOptions) && product.packOptions.length > 0) {
+        const sanitizedPacks = product.packOptions
+          .map(opt => {
+            if (!opt || typeof opt !== 'object') return null;
+            const sanitizedOpt = {
+              label: typeof opt.label === 'string' ? opt.label : undefined,
+              size: typeof opt.size === 'string' ? opt.size : undefined,
+              quantity: typeof opt.quantity === 'number' ? opt.quantity : undefined,
+              unit: typeof opt.unit === 'string' ? opt.unit : undefined,
+              price: typeof opt.price !== 'undefined' ? (typeof opt.price === 'number' ? opt.price : String(opt.price)) : undefined,
+            };
+            // Remove undefined values
+            Object.keys(sanitizedOpt).forEach(key => {
+              if (sanitizedOpt[key] === undefined) delete sanitizedOpt[key];
+            });
+            return Object.keys(sanitizedOpt).length > 0 ? sanitizedOpt : null;
+          })
+          .filter(Boolean);
+        if (sanitizedPacks.length > 0) {
+          sanitized.packOptions = sanitizedPacks;
+        }
+      }
+
+      if (Array.isArray(product.packs) && product.packs.length > 0) {
+        const sanitizedPacks = product.packs
+          .map(pack => {
+            if (!pack || typeof pack !== 'object') return null;
+            const sanitizedPack = {
+              label: typeof pack.label === 'string' ? pack.label : undefined,
+              size: typeof pack.size === 'string' ? pack.size : undefined,
+              quantity: typeof pack.quantity === 'number' ? pack.quantity : undefined,
+              unit: typeof pack.unit === 'string' ? pack.unit : undefined,
+              price: typeof pack.price !== 'undefined' ? (typeof pack.price === 'number' ? pack.price : String(pack.price)) : undefined,
+            };
+            // Remove undefined values
+            Object.keys(sanitizedPack).forEach(key => {
+              if (sanitizedPack[key] === undefined) delete sanitizedPack[key];
+            });
+            return Object.keys(sanitizedPack).length > 0 ? sanitizedPack : null;
+          })
+          .filter(Boolean);
+        if (sanitizedPacks.length > 0) {
+          sanitized.packs = sanitizedPacks;
+        }
+      }
+
+      // Remove undefined/null values to reduce payload size and ensure serializability
+      Object.keys(sanitized).forEach(key => {
+        if (sanitized[key] === undefined || sanitized[key] === null) {
+          delete sanitized[key];
+        } else if (!isSerializable(sanitized[key])) {
+          console.warn(`Removing non-serializable property: ${key}`, sanitized[key]);
+          delete sanitized[key];
+        }
+      });
+
+      // Final validation - ensure the object is serializable
+      try {
+        JSON.stringify(sanitized);
+        return sanitized;
+      } catch (e) {
+        console.error('Product still not serializable after sanitization:', e);
+        // Return minimal safe product
+        return {
+          id: String(product?.id || ''),
+          name: String(product?.name || ''),
+          brand: String(product?.brand || ''),
+          price: typeof product?.price !== 'undefined' ? (typeof product.price === 'number' ? product.price : String(product.price)) : '',
+          category: String(product?.category || ''),
+        };
+      }
+    } catch (error) {
+      console.error('Error sanitizing product:', error);
+      // Return minimal safe product
+      return {
+        id: String(product?.id || ''),
+        name: String(product?.name || ''),
+        brand: String(product?.brand || ''),
+        price: typeof product?.price !== 'undefined' ? (typeof product.price === 'number' ? product.price : String(product.price)) : '',
+        category: String(product?.category || ''),
+      };
+    }
+  }, []);
+
   const openSearchScreen = useCallback(
     (initialQuery = '', options = {}) => {
-      navigation.navigate('Search', {
-        initialQuery,
-        prefetchedRecentSearches: recentSearches,
-        recommendedProducts,
-        contextualRecommended: getRecommendedFromOrders(),
-        allProducts,
-        submitOnOpen: Boolean(options.submitOnOpen),
-      });
+      try {
+        // Check if navigation is available
+        if (!navigation || typeof navigation.navigate !== 'function') {
+          console.error('Navigation not available');
+          Alert.alert('Error', 'Navigation is not available. Please try again.');
+          return;
+        }
+
+        // Ensure all data is valid before navigation
+        const safeRecentSearches = Array.isArray(recentSearches) ? recentSearches : [];
+        const safeRecommendedProducts = Array.isArray(recommendedProducts) ? recommendedProducts : [];
+        const safeAllProducts = Array.isArray(allProducts) ? allProducts : [];
+        
+        // Safely get recommended from orders
+        let contextualRecommended = [];
+        try {
+          if (getRecommendedFromOrders && typeof getRecommendedFromOrders === 'function') {
+            contextualRecommended = getRecommendedFromOrders();
+          }
+          if (!Array.isArray(contextualRecommended)) {
+            contextualRecommended = [];
+          }
+        } catch (error) {
+          console.error('Error getting recommended from orders:', error);
+          contextualRecommended = safeRecommendedProducts.slice(0, 3);
+        }
+        
+        // Ensure contextualRecommended is an array
+        if (!Array.isArray(contextualRecommended)) {
+          contextualRecommended = [];
+        }
+        
+        // Sanitize all products to remove non-serializable properties (like imageRequire)
+        const sanitizeProducts = (products) => {
+          if (!Array.isArray(products)) return [];
+          // Limit the number of products to prevent navigation payload from being too large
+          const limitedProducts = products.slice(0, 100); // Limit to 100 products max
+          return limitedProducts
+            .filter(p => p != null)
+            .map(p => sanitizeProductForNavigation(p))
+            .filter(p => p != null);
+        };
+        
+        // Prepare navigation params with sanitized, serializable data
+        const navParams = {
+          initialQuery: String(initialQuery || ''),
+          prefetchedRecentSearches: Array.isArray(safeRecentSearches) ? safeRecentSearches.slice(0, 10) : [],
+          recommendedProducts: sanitizeProducts(safeRecommendedProducts),
+          contextualRecommended: sanitizeProducts(contextualRecommended),
+          allProducts: sanitizeProducts(safeAllProducts),
+          submitOnOpen: Boolean(options.submitOnOpen),
+        };
+
+        // Final validation - ensure params are serializable
+        try {
+          JSON.stringify(navParams);
+        } catch (e) {
+          console.error('Navigation params not serializable, using minimal params:', e);
+          // Use minimal safe params if serialization fails
+          return navigation.navigate('Search', {
+            initialQuery: String(initialQuery || ''),
+            prefetchedRecentSearches: [],
+            recommendedProducts: [],
+            contextualRecommended: [],
+            allProducts: [],
+            submitOnOpen: false,
+          });
+        }
+        
+        // Navigate with safe, serializable data
+        navigation.navigate('Search', navParams);
+      } catch (error) {
+        console.error('Error opening search screen:', error);
+        console.error('Error stack:', error.stack);
+        // Fallback navigation with minimal data
+        try {
+          if (navigation && typeof navigation.navigate === 'function') {
+            navigation.navigate('Search', {
+              initialQuery: String(initialQuery || ''),
+              prefetchedRecentSearches: [],
+              recommendedProducts: [],
+              contextualRecommended: [],
+              allProducts: [],
+              submitOnOpen: false,
+            });
+          } else {
+            Alert.alert('Error', 'Unable to open search. Please try again.');
+          }
+        } catch (navError) {
+          console.error('Navigation error:', navError);
+          console.error('Navigation error stack:', navError.stack);
+          Alert.alert('Error', 'Unable to open search. Please try again.');
+        }
+      }
     },
     [
       navigation,
@@ -790,6 +1142,7 @@ export default function HomeScreen() {
       recommendedProducts,
       getRecommendedFromOrders,
       allProducts,
+      sanitizeProductForNavigation,
     ],
   );
 
@@ -980,14 +1333,67 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.searchBar}
             activeOpacity={0.85}
-            onPress={() => openSearchScreen()}
+            onPress={() => {
+              try {
+                if (openSearchScreen && typeof openSearchScreen === 'function') {
+                  openSearchScreen();
+                } else {
+                  console.error('openSearchScreen is not a function');
+                  // Fallback: try direct navigation with minimal safe params
+                  try {
+                    if (navigation && typeof navigation.navigate === 'function') {
+                      navigation.navigate('Search', {
+                        initialQuery: '',
+                        prefetchedRecentSearches: [],
+                        recommendedProducts: [],
+                        contextualRecommended: [],
+                        allProducts: [],
+                        submitOnOpen: false,
+                      });
+                    } else {
+                      Alert.alert('Error', 'Unable to open search. Please try again.');
+                    }
+                  } catch (navErr) {
+                    console.error('Direct navigation error:', navErr);
+                    Alert.alert('Error', 'Unable to open search. Please try again.');
+                  }
+                }
+              } catch (error) {
+                console.error('Error opening search:', error);
+                console.error('Error stack:', error.stack);
+                // Try direct navigation as last resort with absolutely minimal params
+                try {
+                  if (navigation && typeof navigation.navigate === 'function') {
+                    navigation.navigate('Search', {
+                      initialQuery: '',
+                      prefetchedRecentSearches: [],
+                      recommendedProducts: [],
+                      contextualRecommended: [],
+                      allProducts: [],
+                      submitOnOpen: false,
+                    });
+                  } else {
+                    Alert.alert('Error', 'Unable to open search. Please try again.');
+                  }
+                } catch (finalErr) {
+                  console.error('Final navigation attempt error:', finalErr);
+                  Alert.alert('Error', 'Unable to open search. Please try again.');
+                }
+              }
+            }}
           >
             <EvilIcons name="search" size={22} color="#666666" style={{ marginRight: 12 }} />
             <Text style={styles.searchPlaceholder}>{t('searchProducts')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.micButton, isListening && styles.micButtonActive]}
-            onPress={handleMicPress}
+            onPress={() => {
+              try {
+                handleMicPress();
+              } catch (error) {
+                console.error('Error with mic press:', error);
+              }
+            }}
           >
             <Ionicons name={isListening ? "mic" : "mic-outline"} size={18} color="#FFFFFF" />
           </TouchableOpacity>

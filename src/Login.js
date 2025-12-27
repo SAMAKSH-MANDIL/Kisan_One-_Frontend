@@ -19,29 +19,25 @@ import firestore from "@react-native-firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Get device dimensions
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Responsive scaling functions
-const scale = (size) => (screenWidth / 375) * size; // Base width is 375 (iPhone 6/7/8)
-const verticalScale = (size) => (screenHeight / 667) * size; // Base height is 667 (iPhone 6/7/8)
+const scale = (size) => (screenWidth / 375) * size;
+const verticalScale = (size) => (screenHeight / 667) * size;
 const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
 export default function Login() {
     const [phoneNumber, setPhoneNumber] = useState("");
-    const [code, setCode] = useState("");
+    const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
     const [confirm, setConfirm] = useState(null);
     const [loading, setLoading] = useState(false);
     const navigation = useNavigation();
     const otpRefs = useRef([]);
     const insets = useSafeAreaInsets();
 
-    // Get auth and firestore instances once using useMemo to avoid deprecation warnings
     const authInstance = useMemo(() => auth(), []);
     const firestoreInstance = useMemo(() => firestore(), []);
 
     const signInWithPhoneNumber = async () => {
-        // Clean phone number: remove all non-digit characters
         const cleanedPhone = phoneNumber.trim().replace(/\D/g, '');
         
         if (!cleanedPhone) {
@@ -49,7 +45,6 @@ export default function Login() {
             return;
         }
         
-        // Validate Indian phone number (10 digits, not starting with 0 or 1)
         if (cleanedPhone.length !== 10) {
             Alert.alert("Invalid Phone Number", "Please enter a valid 10-digit phone number");
             return;
@@ -62,56 +57,32 @@ export default function Login() {
         
         setLoading(true);
         try {
-            // Format phone number in E.164 format: +[country code][subscriber number]
-            // India country code is 91, subscriber number is 10 digits
             const formattedPhoneNumber = `+91${cleanedPhone}`;
             
-            // Verify auth instance exists
             if (!authInstance) {
                 throw new Error('Firebase Auth is not initialized. Please rebuild the app.');
             }
             
-            console.log('====================================');
-            console.log('Firebase Auth Debug Info:');
-            console.log('Phone Number:', formattedPhoneNumber);
-            console.log('Auth Instance:', authInstance ? 'Initialized' : 'Not Initialized');
-            console.log('Auth Instance Type:', typeof authInstance);
-            console.log('SignInWithPhoneNumber Method:', typeof authInstance.signInWithPhoneNumber);
-            console.log('====================================');
-            
-            // Use the memoized auth instance
-            console.log('Calling signInWithPhoneNumber...');
+            console.log('Sending OTP to:', formattedPhoneNumber);
             const confirmation = await authInstance.signInWithPhoneNumber(formattedPhoneNumber);
-            
-            console.log('Confirmation received:', confirmation ? 'Yes' : 'No');
-            console.log('Confirmation object:', confirmation);
             
             if (!confirmation) {
                 throw new Error('No confirmation object received from Firebase');
             }
             
             setConfirm(confirmation);
+            setOtpDigits(['', '', '', '', '', '']);
             
             Alert.alert(
                 "Code Sent", 
                 "Verification code has been sent to your phone number.\n\nPlease check your SMS inbox."
             );
         } catch (error) {
-            console.error('====================================');
-            console.error('Firebase Auth Error Details:');
-            console.error('Error Object:', error);
-            console.error('Error Type:', typeof error);
-            console.error('Error Code:', error?.code);
-            console.error('Error Message:', error?.message);
-            console.error('Error Stack:', error?.stack);
-            console.error('Full Error:', JSON.stringify(error, null, 2));
-            console.error('====================================');
+            console.error('Firebase Auth Error:', error);
             
             let errorMessage = "Failed to send verification code. Please try again.";
             let errorTitle = "Error";
-            let showDetailedInfo = false;
             
-            // Handle specific Firebase Auth errors
             if (error?.code) {
                 switch (error.code) {
                     case 'auth/invalid-phone-number':
@@ -132,37 +103,12 @@ export default function Login() {
                         break;
                     case 'auth/operation-not-allowed':
                         errorTitle = "Operation Not Allowed";
-                        errorMessage = "Phone authentication is not enabled in Firebase Console. Please enable it in Authentication > Sign-in method > Phone.";
-                        showDetailedInfo = true;
-                        break;
-                    case 'auth/captcha-check-failed':
-                        errorTitle = "Verification Failed";
-                        errorMessage = "Captcha verification failed. Please try again.";
+                        errorMessage = "Phone authentication is not enabled in Firebase Console.";
                         break;
                     default:
-                        errorMessage = `Error: ${error.code || 'Unknown error'}\n${error?.message || 'Please check Firebase configuration.'}`;
-                        showDetailedInfo = true;
+                        errorMessage = `Error: ${error.code}\n${error?.message || 'Please try again.'}`;
                         break;
                 }
-            } else if (error?.message) {
-                // Check for common setup issues
-                if (error.message.includes('not initialized') || error.message.includes('native module')) {
-                    errorTitle = "Firebase Not Configured";
-                    errorMessage = "Firebase Auth is not properly initialized. Please:\n\n1. Rebuild the app: npx expo run:android\n2. Ensure Firebase plugins are installed\n3. Check google-services.json is correct";
-                } else {
-                    errorMessage = error.message;
-                }
-                showDetailedInfo = true;
-            }
-            
-            // Show detailed error info in console for debugging
-            if (showDetailedInfo) {
-                console.error('Troubleshooting Steps:');
-                console.error('1. Check Firebase Console: https://console.firebase.google.com');
-                console.error('2. Enable Phone Authentication in: Authentication > Sign-in method > Phone');
-                console.error('3. For Android: Add SHA-1 certificate in Project Settings > Your App');
-                console.error('4. Rebuild the app: npx expo run:android');
-                console.error('5. Ensure google-services.json is in android/app/ directory');
             }
             
             Alert.alert(errorTitle, errorMessage);
@@ -172,34 +118,134 @@ export default function Login() {
     };
 
     const confirmCode = async () => {
-        if (!code.trim()) {
-            Alert.alert("Error", "Please enter the verification code");
+        const fullCode = otpDigits.join('');
+        
+        if (fullCode.length !== 6) {
+            Alert.alert("Incomplete Code", "Please enter all 6 digits of the verification code");
+            return;
+        }
+        
+        if (!/^\d{6}$/.test(fullCode)) {
+            Alert.alert("Invalid Code", "Please enter only numbers");
             return;
         }
         
         setLoading(true);
         try {
-            const userCredential = await confirm.confirm(code);
+            console.log('Verifying OTP:', fullCode);
+            console.log('Confirmation object exists:', !!confirm);
+            
+            if (!confirm) {
+                throw new Error('No confirmation object. Please request a new code.');
+            }
+            
+            const userCredential = await confirm.confirm(fullCode);
             const user = userCredential.user;
 
-            //check if the user is new or existing
-            const userDocument = await firestoreInstance
-                .collection("users")
-                .doc(user.uid)
-                .get();
+            console.log('OTP verified successfully, user:', user.uid);
 
-            if (userDocument.exists) {
-                // user is existing, go to Dashboard (Splash will keep them logged in next opens)
-                navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
-            } else {
-                //user is new,navigate to detail
-                navigation.navigate("Detail", { uid: user.uid });
+            // Check if user profile exists, if not navigate to Detail screen
+            try {
+                const userDoc = await firestoreInstance.collection('users').doc(user.uid).get();
+                const userData = userDoc.data();
+                
+                // Small delay to ensure navigation is ready
+                setTimeout(() => {
+                    try {
+                        // If user doesn't have name, navigate to Detail screen to complete profile
+                        if (!userData || !userData.name) {
+                            console.log('User profile incomplete, navigating to Detail screen');
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'Detail', params: { uid: user.uid } }],
+                            });
+                        } else {
+                            // User profile complete, navigate to Dashboard (Home tab)
+                            console.log('User profile complete, navigating to Dashboard');
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'Dashboard' }],
+                            });
+                        }
+                    } catch (navError) {
+                        console.error('Navigation error:', navError);
+                        // Fallback: simple navigate
+                        try {
+                            navigation.navigate('Dashboard');
+                        } catch (fallbackError) {
+                            console.error('Fallback navigation also failed:', fallbackError);
+                        }
+                    }
+                }, 100);
+            } catch (error) {
+                console.error('Error checking user profile:', error);
+                // On error, still navigate to Dashboard with delay
+                setTimeout(() => {
+                    try {
+                        navigation.reset({
+                            index: 0,
+                            routes: [{ name: 'Dashboard' }],
+                        });
+                    } catch (navError) {
+                        console.error('Navigation error after profile check failed:', navError);
+                        try {
+                            navigation.navigate('Dashboard');
+                        } catch (fallbackError) {
+                            console.error('Fallback navigation also failed:', fallbackError);
+                        }
+                    }
+                }, 100);
             }
         } catch (error) {
-            console.log("Invalid code.", error);
-            Alert.alert("Error", "Invalid verification code. Please try again.");
+            console.error('OTP Verification Error:', error);
+            console.error('Error code:', error?.code);
+            console.error('Error message:', error?.message);
+            
+            let errorMessage = "Invalid verification code. Please try again.";
+            let errorTitle = "Verification Failed";
+            
+            if (error?.code === 'auth/invalid-verification-code') {
+                errorMessage = "The verification code is incorrect. Please check and try again.";
+            } else if (error?.code === 'auth/code-expired') {
+                errorTitle = "Code Expired";
+                errorMessage = "The verification code has expired. Please request a new code.";
+                setConfirm(null);
+                setOtpDigits(['', '', '', '', '', '']);
+            } else if (error?.code === 'auth/session-expired') {
+                errorTitle = "Session Expired";
+                errorMessage = "Your verification session has expired. Please request a new code.";
+                setConfirm(null);
+                setOtpDigits(['', '', '', '', '', '']);
+            } else if (error?.code === 'firestore/permission-denied') {
+                errorTitle = "Permission Error";
+                errorMessage = "Database permission error. Please update Firestore security rules.";
+            } else if (error?.message && !error?.message.includes('No confirmation object')) {
+                errorMessage = error.message;
+            }
+            
+            Alert.alert(errorTitle, errorMessage);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleOtpChange = (text, index) => {
+        const digit = text.slice(-1);
+        
+        const newOtpDigits = [...otpDigits];
+        newOtpDigits[index] = digit;
+        setOtpDigits(newOtpDigits);
+        
+        if (digit && index < 5) {
+            otpRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleKeyPress = (e, index) => {
+        if (e.nativeEvent.key === 'Backspace') {
+            if (!otpDigits[index] && index > 0) {
+                otpRefs.current[index - 1]?.focus();
+            }
         }
     };
 
@@ -220,7 +266,6 @@ export default function Login() {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Header */}
                     <View style={[
                         styles.header,
                         { paddingTop: Math.max(insets?.top || 0, verticalScale(10)) }
@@ -250,7 +295,6 @@ export default function Login() {
                         </Text>
                     </View>
 
-                    {/* Form */}
                     <View style={styles.formContainer}>
                         {!confirm ? (
                             <>
@@ -264,7 +308,6 @@ export default function Login() {
                                             style={styles.phoneInput}
                                             value={phoneNumber}
                                             onChangeText={(text) => {
-                                                // Only allow digits and limit to 10 digits
                                                 const digits = text.replace(/\D/g, '').slice(0, 10);
                                                 setPhoneNumber(digits);
                                             }}
@@ -306,27 +349,17 @@ export default function Login() {
                                             <TextInput
                                                 key={index}
                                                 ref={(ref) => (otpRefs.current[index] = ref)}
-                                                style={styles.otpBox}
-                                                value={code[index] || ''}
-                                                onChangeText={(text) => {
-                                                    const newCode = code.split('');
-                                                    newCode[index] = text;
-                                                    const updatedCode = newCode.join('');
-                                                    setCode(updatedCode);
-                                                    
-                                                    // Auto-focus next box
-                                                    if (text && index < 5) {
-                                                        otpRefs.current[index + 1]?.focus();
-                                                    }
-                                                }}
-                                                onKeyPress={({ nativeEvent }) => {
-                                                    if (nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
-                                                        otpRefs.current[index - 1]?.focus();
-                                                    }
-                                                }}
+                                                style={[
+                                                    styles.otpBox,
+                                                    otpDigits[index] && styles.otpBoxFilled
+                                                ]}
+                                                value={otpDigits[index]}
+                                                onChangeText={(text) => handleOtpChange(text, index)}
+                                                onKeyPress={(e) => handleKeyPress(e, index)}
                                                 keyboardType="numeric"
                                                 maxLength={1}
                                                 autoFocus={index === 0}
+                                                selectTextOnFocus
                                             />
                                         ))}
                                     </View>
@@ -343,7 +376,10 @@ export default function Login() {
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    onPress={() => setConfirm(null)}
+                                    onPress={() => {
+                                        setConfirm(null);
+                                        setOtpDigits(['', '', '', '', '', '']);
+                                    }}
                                     style={styles.resendButton}
                                 >
                                     <Text style={styles.resendButtonText}>Resend Code</Text>
@@ -352,7 +388,6 @@ export default function Login() {
                         )}
                     </View>
 
-                    {/* Footer */}
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>
                             By continuing, you agree to our Terms of Service and Privacy Policy
@@ -399,9 +434,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: verticalScale(12),
     },
-    logoText: {
-        fontSize: moderateScale(40),
-    },
     logoImage: {
         width: '100%',
         height: '100%',
@@ -414,11 +446,6 @@ const styles = StyleSheet.create({
         height: verticalScale(48),
         marginTop: verticalScale(4),
         maxWidth: '90%',
-    },
-    appName: {
-        fontSize: moderateScale(28),
-        fontWeight: 'bold',
-        color: '#2E7D32',
     },
     welcomeText: {
         fontSize: moderateScale(22),
@@ -448,16 +475,6 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#333333',
         marginBottom: verticalScale(8),
-    },
-    textInput: {
-        height: Math.max(verticalScale(50), 50),
-        borderWidth: 2,
-        borderColor: '#E0E0E0',
-        borderRadius: moderateScale(12),
-        paddingHorizontal: scale(16),
-        fontSize: moderateScale(16),
-        backgroundColor: '#F8F9FA',
-        color: '#333333',
     },
     phoneInputContainer: {
         flexDirection: 'row',
@@ -501,7 +518,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginTop: verticalScale(8),
         paddingHorizontal: scale(2),
-        flexWrap: 'wrap',
     },
     otpBox: {
         width: Math.min(scale(48), (screenWidth - scale(60)) / 6 - scale(4)),
@@ -516,6 +532,10 @@ const styles = StyleSheet.create({
         color: '#333333',
         marginHorizontal: scale(2),
         minWidth: 40,
+    },
+    otpBoxFilled: {
+        borderColor: '#2E7D32',
+        backgroundColor: '#E8F5E8',
     },
     button: {
         backgroundColor: '#2E7D32',

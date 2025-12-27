@@ -209,60 +209,48 @@ export default function CropDoctorScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Modern Header with Gradient Background */}
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Ionicons name="medical" size={24} color="#FFFFFF" style={styles.headerIcon} />
-            <Text style={styles.headerTitle}>Crop Doctor</Text>
-          </View>
-          <View style={{ width: 44 }} />
-        </View>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Crop Doctor</Text>
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView 
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
+        {/* AI-Powered Section */}
         <View style={styles.heroSection}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="leaf" size={48} color="#2E7D32" />
-          </View>
           <Text style={styles.title}>AI-Powered Crop Disease Detection</Text>
           <Text style={styles.subtitle}>
-            Capture or upload a photo of your crop leaves to get instant AI-powered disease diagnosis with detailed treatment recommendations
+            Take a photo of your crop leaves and get instant disease diagnosis with treatment recommendations.
           </Text>
         </View>
 
-        {/* Image Capture Section */}
+        {/* Step 1: Capture Image Section */}
         <View style={styles.captureSection}>
-          <Text style={styles.sectionTitle}>📷 Capture or Select Image</Text>
+          <Text style={styles.sectionTitle}>Step 1: Capture Image</Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity 
               style={[styles.cta, styles.cameraBtn]} 
               onPress={openCamera}
               activeOpacity={0.8}
             >
-              <View style={styles.buttonIconContainer}>
-                <Ionicons name="camera" size={24} color="#FFFFFF" />
-              </View>
-              <Text style={styles.ctaText}>Take Photo</Text>
+              <Ionicons name="camera" size={24} color="#FFFFFF" />
+              <Text style={styles.ctaText}>Camera</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.cta, styles.galleryBtn]} 
               onPress={openGallery}
               activeOpacity={0.8}
             >
-              <View style={styles.buttonIconContainer}>
-                <Ionicons name="images" size={24} color="#FFFFFF" />
-              </View>
-              <Text style={styles.ctaText}>Choose from Gallery</Text>
+              <Ionicons name="images" size={24} color="#FFFFFF" />
+              <Text style={styles.ctaText}>Gallery</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -355,53 +343,36 @@ export default function CropDoctorScreen({ navigation }) {
 
         {/* Tips Section */}
         <View style={styles.tipsSection}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="bulb" size={22} color="#2E7D32" />
-            <Text style={styles.sectionTitle}>Tips for Better Results</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Tips for Better Results</Text>
           <View style={styles.tipsCard}>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="camera-outline" size={20} color="#2E7D32" />
-              </View>
-              <Text style={styles.tipText}>Take clear, well-lit photos</Text>
+            <View style={styles.photoGuidelinesHeader}>
+              <Ionicons name="camera-outline" size={18} color="#374151" />
+              <Text style={styles.photoGuidelinesTitle}>Photo Guidelines:</Text>
             </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="eye-outline" size={20} color="#2E7D32" />
-              </View>
-              <Text style={styles.tipText}>Focus on affected leaves</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="flash-off-outline" size={20} color="#2E7D32" />
-              </View>
-              <Text style={styles.tipText}>Avoid blurry or dark images</Text>
-            </View>
-            <View style={styles.tipItem}>
-              <View style={styles.tipIcon}>
-                <Ionicons name="contrast-outline" size={20} color="#2E7D32" />
-              </View>
-              <Text style={styles.tipText}>Include both healthy and diseased parts</Text>
+            <View style={styles.tipsList}>
+              <Text style={styles.tipBullet}>• Take clear, well-lit photos</Text>
+              <Text style={styles.tipBullet}>• Focus on affected leaves</Text>
+              <Text style={styles.tipBullet}>• Avoid blurry or dark images</Text>
+              <Text style={styles.tipBullet}>• Include both healthy and diseased parts</Text>
             </View>
           </View>
         </View>
 
         {/* Supported Crops Section */}
         <View style={styles.cropsSection}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="apps" size={22} color="#2E7D32" />
-            <Text style={styles.sectionTitle}>Supported Crops</Text>
-          </View>
-          <View style={styles.chipsWrap}>
+          <Text style={styles.sectionTitle}>Supported Crops</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsWrap}
+          >
             {['Wheat', 'Rice', 'Maize', 'Cotton', 'Sugarcane', 'Tomato', 'Potato', 'Chili']
               .map((c) => (
                 <View key={c} style={styles.chip}>
-                  <Ionicons name="leaf-outline" size={14} color="#2E7D32" />
                   <Text style={styles.chipText}>{c}</Text>
                 </View>
             ))}
-          </View>
+          </ScrollView>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -411,92 +382,61 @@ export default function CropDoctorScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   header: {
-    backgroundColor: '#2E7D32',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  headerContent: {
-    height: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingTop: 40,
+
   },
   backBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerIcon: {
-    marginRight: 4,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    color: '#111827',
+    flex: 1,
+    textAlign: 'center',
   },
   content: {
     padding: 20,
     paddingBottom: 40,
   },
   heroSection: {
-    alignItems: 'center',
     marginBottom: 24,
     paddingTop: 8,
   },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E8F5E9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 10,
-    textAlign: 'center',
-    lineHeight: 32,
+    color: '#111827',
+    marginBottom: 12,
+    lineHeight: 28,
   },
   subtitle: {
     fontSize: 15,
     color: '#6B7280',
-    textAlign: 'center',
     lineHeight: 22,
-    paddingHorizontal: 8,
   },
   captureSection: {
     marginBottom: 24,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
-  },
   sectionTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#111827',
+    marginBottom: 16,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -508,15 +448,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 20,
+    paddingVertical: 16,
     paddingHorizontal: 12,
-    borderRadius: 16,
-    minHeight: 110,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 12,
+    minHeight: 80,
   },
   cameraBtn: {
     backgroundColor: '#2E7D32',
@@ -524,17 +459,9 @@ const styles = StyleSheet.create({
   galleryBtn: {
     backgroundColor: '#0284C7',
   },
-  buttonIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   ctaText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -737,30 +664,24 @@ const styles = StyleSheet.create({
   },
   tipsCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: 12,
+    padding: 16,
   },
-  tipItem: {
+  photoGuidelinesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    marginBottom: 16,
+    gap: 8,
+    marginBottom: 12,
   },
-  tipIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E8F5E9',
-    alignItems: 'center',
-    justifyContent: 'center',
+  photoGuidelinesTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
   },
-  tipText: {
-    flex: 1,
+  tipsList: {
+    gap: 8,
+  },
+  tipBullet: {
     fontSize: 15,
     color: '#374151',
     lineHeight: 22,
@@ -770,28 +691,20 @@ const styles = StyleSheet.create({
   },
   chipsWrap: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
+    paddingRight: 20,
   },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#2E7D32',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
   },
   chipText: {
     fontSize: 14,
-    color: '#2E7D32',
-    fontWeight: '600',
+    color: '#374151',
+    fontWeight: '500',
   },
 });

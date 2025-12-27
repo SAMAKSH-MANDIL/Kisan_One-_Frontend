@@ -265,22 +265,95 @@ export default function MyProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user) {
+      Alert.alert('Error', 'User not logged in. Please login again.');
+      return;
+    }
+
+    // Validate required fields
+    if (!name || !name.trim()) {
+      Alert.alert('Validation Error', 'Please enter your name.');
+      return;
+    }
+
     setSaving(true);
     try {
-      await firestore().collection('users').doc(user.uid).set({
-        name,
-        state: stateName,
-        city,
-        address,
+      // Check if firestore is available
+      if (!firestore || typeof firestore !== 'function') {
+        throw new Error('Firestore is not available. Please check your Firebase configuration.');
+      }
+
+      // Verify user is still authenticated
+      const currentUser = auth().currentUser;
+      if (!currentUser || currentUser.uid !== user.uid) {
+        throw new Error('User session expired. Please login again.');
+      }
+
+      const userRef = firestore().collection('users').doc(user.uid);
+      
+      // Prepare timestamp - use the correct FieldValue API
+      let timestamp;
+      try {
+        // Try the correct React Native Firebase pattern
+        if (firestore.FieldValue && typeof firestore.FieldValue.serverTimestamp === 'function') {
+          timestamp = firestore.FieldValue.serverTimestamp();
+        } else if (firestore().FieldValue && typeof firestore().FieldValue.serverTimestamp === 'function') {
+          timestamp = firestore().FieldValue.serverTimestamp();
+        } else {
+          // Fallback to Date.now() if FieldValue is not available
+          timestamp = Date.now();
+        }
+      } catch (e) {
+        console.warn('Could not use serverTimestamp, using Date.now()', e);
+        timestamp = Date.now();
+      }
+      
+      // Prepare data with proper types
+      const profileData = {
+        name: name.trim(),
+        state: stateName || '',
+        city: city || '',
+        address: address || '',
         phone: user.phoneNumber || '',
-        updatedAt: Date.now(),
-      }, { merge: true });
+        updatedAt: timestamp,
+      };
+
+      // Try to save
+      await userRef.set(profileData, { merge: true });
+      
       Alert.alert('Saved', 'Your profile has been updated.');
       navigation.goBack();
     } catch (e) {
-      console.log('Save error', e);
-      Alert.alert('Error', 'Failed to save profile.');
+      console.error('Save error:', e);
+      console.error('Error code:', e?.code);
+      console.error('Error message:', e?.message);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to save profile.';
+      let errorTitle = 'Error';
+      
+      if (e?.code === 'permission-denied') {
+        errorTitle = 'Permission Denied';
+        errorMessage = 'Your Firestore security rules are blocking this operation.\n\n' +
+          'Please update your Firestore rules in Firebase Console:\n' +
+          '1. Go to Firebase Console → Firestore Database → Rules\n' +
+          '2. Add rule: allow read, write: if request.auth != null && request.auth.uid == userId;\n' +
+          '3. Publish the rules\n\n' +
+          'Or contact your administrator to fix the security rules.';
+      } else if (e?.code === 'unavailable') {
+        errorTitle = 'Network Error';
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (e?.code === 'deadline-exceeded') {
+        errorTitle = 'Timeout';
+        errorMessage = 'Request timeout. Please try again.';
+      } else if (e?.code === 'unauthenticated') {
+        errorTitle = 'Authentication Error';
+        errorMessage = 'You are not logged in. Please login again.';
+      } else if (e?.message) {
+        errorMessage = `Error: ${e.message}`;
+      }
+      
+      Alert.alert(errorTitle, errorMessage);
     } finally {
       setSaving(false);
     }

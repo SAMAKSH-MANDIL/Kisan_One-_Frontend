@@ -29,7 +29,27 @@ const SearchScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
-  const { t, getVoiceLocale } = useLanguage();
+  
+  // Safely get language context with error handling
+  let t, getVoiceLocale;
+  try {
+    const languageContext = useLanguage();
+    t = languageContext?.t || ((key) => key);
+    getVoiceLocale = languageContext?.getVoiceLocale || (() => 'en-US');
+  } catch (error) {
+    console.error('Error getting language context:', error);
+    t = (key) => key;
+    getVoiceLocale = () => 'en-US';
+  }
+
+  // Safely extract route params with validation
+  let routeParams = {};
+  try {
+    routeParams = route?.params || {};
+  } catch (error) {
+    console.error('Error reading route params:', error);
+    routeParams = {};
+  }
 
   const {
     initialQuery = '',
@@ -38,12 +58,22 @@ const SearchScreen = () => {
     contextualRecommended: contextualFromRoute = emptyArray,
     allProducts: allProductsFromRoute = emptyArray,
     submitOnOpen = false,
-  } = route.params || {};
+  } = routeParams;
 
-  const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [recentSearches, setRecentSearches] = useState(
-    Array.isArray(prefetchedRecentSearches) ? prefetchedRecentSearches : emptyArray,
-  );
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return typeof initialQuery === 'string' ? initialQuery : '';
+    } catch {
+      return '';
+    }
+  });
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      return Array.isArray(prefetchedRecentSearches) ? prefetchedRecentSearches : emptyArray;
+    } catch {
+      return emptyArray;
+    }
+  });
   const [isListening, setIsListening] = useState(false);
 
   const searchInputRef = useRef(null);
@@ -88,20 +118,43 @@ const SearchScreen = () => {
   );
 
   useEffect(() => {
-    const current = auth().currentUser;
-    if (!current) return undefined;
+    let isMounted = true;
+    try {
+      const current = auth().currentUser;
+      if (!current) return undefined;
 
-    const unsubscribe = firestore()
-      .collection('users')
-      .doc(current.uid)
-      .onSnapshot((doc) => {
-        const data = doc.data() || {};
-        if (Array.isArray(data.recentSearches)) {
-          setRecentSearches(data.recentSearches.slice(0, MAX_RECENT_SEARCHES));
+      const unsubscribe = firestore()
+        .collection('users')
+        .doc(current.uid)
+        .onSnapshot(
+          (doc) => {
+            if (!isMounted) return;
+            try {
+              const data = doc.data() || {};
+              if (Array.isArray(data.recentSearches)) {
+                setRecentSearches(data.recentSearches.slice(0, MAX_RECENT_SEARCHES));
+              }
+            } catch (error) {
+              console.error('Error processing recent searches:', error);
+            }
+          },
+          (error) => {
+            console.error('Error loading recent searches:', error);
+          }
+        );
+
+      return () => {
+        isMounted = false;
+        try {
+          unsubscribe();
+        } catch (error) {
+          console.error('Error unsubscribing from recent searches:', error);
         }
-      });
-
-    return unsubscribe;
+      };
+    } catch (error) {
+      console.error('Error setting up recent searches listener:', error);
+      return undefined;
+    }
   }, []);
 
   useEffect(() => {
@@ -112,25 +165,38 @@ const SearchScreen = () => {
 
   // Voice recognition handlers
   useEffect(() => {
+    let isMounted = true;
+    
     try {
       if (Voice && typeof Voice === 'object') {
-        Voice.onSpeechStart = () => setIsListening(true);
-        Voice.onSpeechEnd = () => setIsListening(false);
-        Voice.onSpeechError = (e) => {
+        const onSpeechStart = () => {
+          if (isMounted) setIsListening(true);
+        };
+        const onSpeechEnd = () => {
+          if (isMounted) setIsListening(false);
+        };
+        const onSpeechError = (e) => {
           console.error('Speech error:', e);
-          setIsListening(false);
+          if (isMounted) setIsListening(false);
           if (e?.error?.message !== '7') { // Ignore error 7 (no match)
-            Alert.alert('Error', 'Could not process your voice. Please try again.');
+            if (isMounted) {
+              Alert.alert('Error', 'Could not process your voice. Please try again.');
+            }
           }
         };
-        Voice.onSpeechResults = (e) => {
+        const onSpeechResults = (e) => {
           const result = e && e.value && e.value[0];
-          if (result) {
+          if (result && isMounted) {
             setSearchQuery(result);
             handleSearchSubmit(result);
           }
-          setIsListening(false);
+          if (isMounted) setIsListening(false);
         };
+
+        Voice.onSpeechStart = onSpeechStart;
+        Voice.onSpeechEnd = onSpeechEnd;
+        Voice.onSpeechError = onSpeechError;
+        Voice.onSpeechResults = onSpeechResults;
       } else {
         console.warn('Voice module is null. Skipping listener registration. Rebuild may be required.');
       }
@@ -139,13 +205,16 @@ const SearchScreen = () => {
     }
 
     return () => {
+      isMounted = false;
       try {
         if (Voice && typeof Voice.destroy === 'function') {
           Voice.destroy().then(() => {
             if (typeof Voice.removeAllListeners === 'function') Voice.removeAllListeners();
           }).catch(() => {});
         }
-      } catch (_) {}
+      } catch (_) {
+        // Ignore cleanup errors
+      }
     };
   }, [handleSearchSubmit]);
 
@@ -166,38 +235,54 @@ const SearchScreen = () => {
   }, [isListening]);
 
   const combinedRecommended = useMemo(() => {
-    const seen = new Map();
-    const combined = [
-      ...(Array.isArray(contextualFromRoute) ? contextualFromRoute : emptyArray),
-      ...(Array.isArray(recommendedFromRoute) ? recommendedFromRoute : emptyArray),
-    ];
-    combined.forEach((product) => {
-      if (product && product.id != null && !seen.has(product.id)) {
-        seen.set(product.id, product);
-      }
-    });
-    return Array.from(seen.values());
+    try {
+      const seen = new Map();
+      const safeContextual = Array.isArray(contextualFromRoute) ? contextualFromRoute : emptyArray;
+      const safeRecommended = Array.isArray(recommendedFromRoute) ? recommendedFromRoute : emptyArray;
+      const combined = [...safeContextual, ...safeRecommended];
+      combined.forEach((product) => {
+        if (product && product.id != null && !seen.has(product.id)) {
+          seen.set(product.id, product);
+        }
+      });
+      return Array.from(seen.values());
+    } catch (error) {
+      console.error('Error combining recommended products:', error);
+      return emptyArray;
+    }
   }, [contextualFromRoute, recommendedFromRoute]);
 
   const allProducts = useMemo(() => {
-    if (Array.isArray(allProductsFromRoute) && allProductsFromRoute.length > 0) {
-      return allProductsFromRoute;
+    try {
+      if (Array.isArray(allProductsFromRoute) && allProductsFromRoute.length > 0) {
+        return allProductsFromRoute;
+      }
+      return combinedRecommended;
+    } catch (error) {
+      console.error('Error processing all products:', error);
+      return emptyArray;
     }
-    return combinedRecommended;
   }, [allProductsFromRoute, combinedRecommended]);
 
   const filteredProducts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
+    try {
+      const query = (searchQuery || '').trim().toLowerCase();
+      if (!query) {
+        return combinedRecommended;
+      }
+      const safeAllProducts = Array.isArray(allProducts) ? allProducts : emptyArray;
+      const matches = safeAllProducts.filter((product) => {
+        if (!product) return false;
+        const name = (product?.name || '').toLowerCase();
+        const brand = (product?.brand || '').toLowerCase();
+        const category = (product?.category || '').toLowerCase();
+        return name.includes(query) || brand.includes(query) || category.includes(query);
+      });
+      return matches.length > 0 ? matches : combinedRecommended;
+    } catch (error) {
+      console.error('Error filtering products:', error);
       return combinedRecommended;
     }
-    const matches = (allProducts || []).filter((product) => {
-      const name = product?.name?.toLowerCase() || '';
-      const brand = product?.brand?.toLowerCase() || '';
-      const category = product?.category?.toLowerCase() || '';
-      return name.includes(query) || brand.includes(query) || category.includes(query);
-    });
-    return matches.length > 0 ? matches : combinedRecommended;
   }, [searchQuery, allProducts, combinedRecommended]);
 
   const handleRecentTap = useCallback(
@@ -228,7 +313,7 @@ const SearchScreen = () => {
         Alert.alert('Voice Not Available', 'Please rebuild the app to enable voice recognition.');
         return;
       }
-      const voiceLocale = getVoiceLocale();
+      const voiceLocale = getVoiceLocale ? getVoiceLocale() : 'en-US';
       await Voice.start(voiceLocale);
       Keyboard.dismiss();
     } catch (e) {

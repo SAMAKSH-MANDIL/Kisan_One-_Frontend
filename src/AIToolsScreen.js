@@ -50,7 +50,16 @@ export default function AIToolsScreen() {
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const [showMoreExpanded, setShowMoreExpanded] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const tabBarHeight = typeof useBottomTabBarHeight === 'function' ? useBottomTabBarHeight() : 56;
+  // Safely get tab bar height
+  let tabBarHeight = 56; // Default fallback
+  try {
+    if (typeof useBottomTabBarHeight === 'function') {
+      tabBarHeight = useBottomTabBarHeight();
+    }
+  } catch (error) {
+    console.warn('Error getting tab bar height:', error);
+    tabBarHeight = 56; // Use default
+  }
   const TAB_BAR_OFFSET = tabBarHeight; // height of the app's bottom tab bar
   const drawerWidth = Math.round((typeof Dimensions !== 'undefined' ? Dimensions.get('window').width : 360) * 0.75);
   const drawerTranslateX = React.useRef(new Animated.Value(-drawerWidth)).current;
@@ -116,32 +125,69 @@ export default function AIToolsScreen() {
     if (isRequestingLocationRef.current) return;
     isRequestingLocationRef.current = true;
     try {
+      // Check if Location module is available
+      if (!Location || typeof Location.getForegroundPermissionsAsync !== 'function') {
+        console.warn('Location module not available');
+        setLocationName('Location service unavailable');
+        setLocationEnabled(false);
+        isRequestingLocationRef.current = false;
+        return;
+      }
+      
       // Check existing permission first to avoid duplicate prompts
-      let perm = await Location.getForegroundPermissionsAsync();
+      let perm = null;
+      try {
+        perm = await Location.getForegroundPermissionsAsync();
+      } catch (permError) {
+        console.error('Error getting location permission:', permError);
+        setLocationName('Location permission error');
+        setLocationEnabled(false);
+        isRequestingLocationRef.current = false;
+        return;
+      }
+      
       if (!perm || perm.status !== 'granted') {
-        perm = await Location.requestForegroundPermissionsAsync();
+        try {
+          perm = await Location.requestForegroundPermissionsAsync();
+        } catch (requestError) {
+          console.error('Error requesting location permission:', requestError);
+          setLocationName('Location permission denied');
+          setLocationEnabled(false);
+          isRequestingLocationRef.current = false;
+          return;
+        }
       }
       if (!perm || perm.status !== 'granted') {
         setLocationEnabled(false);
         setLocationName('Location permission not enabled');
+        isRequestingLocationRef.current = false;
         return;
       }
 
       // Get current position with a retry to avoid transient errors right after grant
       let position = null;
       try {
+        if (typeof Location.getCurrentPositionAsync !== 'function') {
+          throw new Error('getCurrentPositionAsync not available');
+        }
         position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
           timeout: 15000,
           maximumAge: 5000,
         });
       } catch (firstErr) {
-        await new Promise(r => setTimeout(r, 800));
-        position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-          timeout: 15000,
-          maximumAge: 5000,
-        });
+        console.log('First location attempt failed, retrying with balanced accuracy:', firstErr);
+        try {
+          await new Promise(r => setTimeout(r, 800));
+          position = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+            timeout: 15000,
+            maximumAge: 5000,
+          });
+        } catch (secondErr) {
+          console.error('Second location attempt also failed:', secondErr);
+          throw secondErr;
+        }
       }
 
       const { latitude, longitude } = position.coords || {};
@@ -290,6 +336,14 @@ export default function AIToolsScreen() {
 
   const checkLocationPermission = async () => {
     try {
+      // Check if Location module is available
+      if (!Location || typeof Location.getForegroundPermissionsAsync !== 'function') {
+        console.warn('Location module not available');
+        setLocationName('Location service unavailable');
+        setLocationEnabled(false);
+        return;
+      }
+      
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === 'granted') {
         await requestAndSetLocation();
@@ -304,6 +358,8 @@ export default function AIToolsScreen() {
       }
     } catch (e) {
       console.log('Permission check error:', e);
+      setLocationName('Location service unavailable');
+      setLocationEnabled(false);
     }
   };
 
@@ -483,7 +539,17 @@ export default function AIToolsScreen() {
   useEffect(() => {
     if (isFocused) {
       // Check and request location permission when user enters AI Tools screen
-      checkLocationPermission();
+      // Add delay to prevent crash on initial mount
+      const timer = setTimeout(() => {
+        try {
+          checkLocationPermission();
+        } catch (error) {
+          console.error('Error checking location permission on focus:', error);
+          setLocationName('Location service unavailable');
+          setLocationEnabled(false);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isFocused]);
 
@@ -498,13 +564,28 @@ export default function AIToolsScreen() {
 
   // If user toggles permission in OS settings, refresh on app foreground
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        checkLocationPermission();
-      }
-    });
+    let sub = null;
+    try {
+      sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') {
+          try {
+            checkLocationPermission();
+          } catch (error) {
+            console.error('Error checking location on app state change:', error);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up app state listener:', error);
+    }
     return () => {
-      try { sub.remove(); } catch (_) {}
+      try {
+        if (sub && typeof sub.remove === 'function') {
+          sub.remove();
+        }
+      } catch (error) {
+        console.error('Error removing app state listener:', error);
+      }
     };
   }, []);
 
@@ -537,25 +618,77 @@ export default function AIToolsScreen() {
   useEffect(() => {
     const onBack = () => {
       if (isDrawerOpen) {
-        closeDrawer();
+        try {
+          closeDrawer();
+        } catch (error) {
+          console.error('Error closing drawer:', error);
+          setIsDrawerOpen(false);
+        }
         return true;
       }
       return false;
     };
-    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
-    return () => sub.remove();
+    let sub = null;
+    try {
+      sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    } catch (error) {
+      console.error('Error setting up back handler:', error);
+    }
+    return () => {
+      try {
+        if (sub && typeof sub.remove === 'function') {
+          sub.remove();
+        }
+      } catch (error) {
+        console.error('Error removing back handler:', error);
+      }
+    };
   }, [isDrawerOpen]);
 
   // Load profile name from Firestore
   useEffect(() => {
-    const u = auth().currentUser;
-    if (!u) return;
-    const ref = firestore().collection('users').doc(u.uid);
-    const unsub = ref.onSnapshot((doc) => {
-      const d = doc.data() || {};
-      setProfileName((d.name && d.name.trim()) ? d.name : 'Farmer');
-    });
-    return () => unsub();
+    let unsub = null;
+    try {
+      const u = auth().currentUser;
+      if (!u) {
+        setProfileName('Farmer');
+        return;
+      }
+      
+      const ref = firestore().collection('users').doc(u.uid);
+      unsub = ref.onSnapshot(
+        (doc) => {
+          try {
+            if (!doc || !doc.exists) {
+              setProfileName('Farmer');
+              return;
+            }
+            const d = doc.data() || {};
+            setProfileName((d.name && d.name.trim()) ? d.name : 'Farmer');
+          } catch (error) {
+            console.error('Error processing profile data:', error);
+            setProfileName('Farmer');
+          }
+        },
+        (error) => {
+          console.error('Error loading profile:', error);
+          setProfileName('Farmer');
+        }
+      );
+    } catch (error) {
+      console.error('Error setting up profile listener:', error);
+      setProfileName('Farmer');
+    }
+    
+    return () => {
+      try {
+        if (unsub) {
+          unsub();
+        }
+      } catch (error) {
+        console.error('Error unsubscribing from profile:', error);
+      }
+    };
   }, []);
 
   const openDrawer = () => {
@@ -779,10 +912,21 @@ export default function AIToolsScreen() {
   }, [isListening]);
 
   const closeDrawer = () => {
-    Animated.parallel([
-      Animated.timing(drawerTranslateX, { toValue: -drawerWidth, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(overlayOpacity, { toValue: 0, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-    ]).start(() => setIsDrawerOpen(false));
+    try {
+      Animated.parallel([
+        Animated.timing(drawerTranslateX, { toValue: -drawerWidth, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]).start(() => {
+        try {
+          setIsDrawerOpen(false);
+        } catch (error) {
+          console.error('Error setting drawer state:', error);
+        }
+      });
+    } catch (error) {
+      console.error('Error closing drawer:', error);
+      setIsDrawerOpen(false);
+    }
   };
 
   const handleLogout = () => {
@@ -852,6 +996,9 @@ export default function AIToolsScreen() {
                 source={require('../assets/doctorOverGreen.png')} 
                 style={styles.toolIconPill}
                 resizeMode="contain"
+                onError={(error) => {
+                  console.log('Error loading Crop Doctor image:', error);
+                }}
               />
               <Text style={styles.toolNamePill} numberOfLines={1}>Crop Doctor</Text>
             </TouchableOpacity>
@@ -864,6 +1011,9 @@ export default function AIToolsScreen() {
                 source={require('../assets/recommendationOverGreen.png')} 
                 style={styles.toolIconPill}
                 resizeMode="contain"
+                onError={(error) => {
+                  console.log('Error loading Crop Recommendation image:', error);
+                }}
               />
               <Text style={styles.toolNamePill} numberOfLines={1}>Crop Recommendation</Text>
             </TouchableOpacity>
