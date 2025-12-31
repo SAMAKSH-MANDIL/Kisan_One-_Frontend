@@ -5,7 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="dbdae775-e2a1-42ab-a771-695fcfe3e10e" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/App.js" beforeDir="false" afterPath="$PROJECT_DIR$/App.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/AIToolsScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/AIToolsScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/CartScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/CartScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/CropDoctorScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/CropDoctorScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/CropRecommendationScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/CropRecommendationScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/InfoScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/InfoScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/LanguageContext.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/LanguageContext.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/LanguageSelectScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/LanguageSelectScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/LanguageSelection.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/LanguageSelection.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Login.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Login.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/MyOrdersScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/MyOrdersScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/MyProfileScreen.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/MyProfileScreen.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/translations.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/translations.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,6 +44,7 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
@@ -38,6 +53,7 @@
     "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "main",
     "last_opened_file_path": "C:/kisanone-frontend-main",
+    "settings.editor.selected.configurable": "AndroidSdkUpdater",
     "show.migrate.to.gradle.popup": "false"
   }
 }]]></component>

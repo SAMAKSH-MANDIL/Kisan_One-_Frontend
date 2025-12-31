@@ -11,13 +11,16 @@ import {
 import { useNavigation } from '@react-navigation/native';
 
 import { useOrders } from './OrdersContext';
+import { useLanguage } from './LanguageContext';
 
 export default function MyOrdersScreen() {
   const navigation = useNavigation();
-  const [activeTab, setActiveTab] = useState('All');
+  const { t } = useLanguage();
+  const [activeTab, setActiveTab] = useState(t('all'));
   const { orders: placedOrders, addOrder } = useOrders();
 
-  const tabs = ['All', 'Pending', 'Delivered', 'Cancelled'];
+  const tabKeys = ['All', 'Pending', 'Delivered', 'Cancelled'];
+  const tabs = tabKeys.map(key => t(key.toLowerCase()));
 
   const sampleOrders = [
     {
@@ -73,18 +76,23 @@ export default function MyOrdersScreen() {
     return [...orders, ...sampleOrders];
   }, [placedOrders]);
 
-  const filteredOrders = activeTab === 'All' 
+  const getTabKey = (tabLabel) => {
+    const index = tabs.indexOf(tabLabel);
+    return index >= 0 ? tabKeys[index] : tabLabel;
+  };
+  
+  const filteredOrders = activeTab === tabs[0] 
     ? mergedOrders 
-    : mergedOrders.filter(order => order.status === activeTab);
+    : mergedOrders.filter(order => order.status === getTabKey(activeTab));
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor="#0e7c36" translucent={false} />
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Orders</Text>
-        <Text style={styles.headerSubtitle}>Track your agricultural purchases</Text>
+        <Text style={styles.headerTitle}>{t('myOrders')}</Text>
+        <Text style={styles.headerSubtitle}>{t('trackYourPurchases')}</Text>
       </View>
 
       {/* Tabs */}
@@ -117,15 +125,15 @@ export default function MyOrdersScreen() {
         {filteredOrders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>No orders found</Text>
+            <Text style={styles.emptyTitle}>{t('noOrdersFound')}</Text>
             <Text style={styles.emptySubtitle}>
-              {activeTab === 'All' 
-                ? "You haven't placed any orders yet"
-                : `No ${activeTab.toLowerCase()} orders`
+              {activeTab === tabs[0] 
+                ? t('noOrdersYet')
+                : t('noStatusOrders').replace('{status}', activeTab)
               }
             </Text>
             <TouchableOpacity style={styles.shopButton}>
-              <Text style={styles.shopButtonText}>Start Shopping</Text>
+              <Text style={styles.shopButtonText}>{t('startShopping')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -142,7 +150,7 @@ export default function MyOrdersScreen() {
               </View>
 
               <View style={styles.orderDetails}>
-                <Text style={styles.itemsCount}>{order.items} items</Text>
+                <Text style={styles.itemsCount}>{order.items} {t('items')}</Text>
                 <Text style={styles.orderTotal}>{order.total}</Text>
               </View>
 
@@ -196,7 +204,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingTop: 40,
     paddingBottom: 30,
     paddingHorizontal: 20,
@@ -226,7 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   activeTab: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
   },
   tabText: {
     fontSize: 14,
@@ -291,7 +299,7 @@ const styles = StyleSheet.create({
   orderTotal: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   productsContainer: {
     marginBottom: 16,
@@ -332,7 +340,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   secondaryButtonText: {
     fontSize: 14,
@@ -362,7 +370,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   shopButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

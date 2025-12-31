@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   addressCard: {
     padding: 12,
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   placeOrderButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 10,

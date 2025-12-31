@@ -35,14 +35,14 @@ export default function HelpScreen() {
         <View style={[styles.card, styles.contactCard]}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.headerIconPill}>
-              <Ionicons name="chatbubbles-outline" size={18} color="#2E7D32" />
+              <Ionicons name="chatbubbles-outline" size={18} color="#0e7c36" />
             </View>
             <Text style={styles.sectionTitle}>Contact Us</Text>
           </View>
-          <View style={styles.row}><Ionicons name="call-outline" size={20} color="#2E7D32" /><Text style={styles.rowText}>  6261118789</Text></View>
-          <View style={styles.row}><Ionicons name="mail-outline" size={20} color="#2E7D32" /><Text style={styles.rowText}>  kisanoneoffice@gmail.com</Text></View>
+          <View style={styles.row}><Ionicons name="call-outline" size={20} color="#0e7c36" /><Text style={styles.rowText}>  6261118789</Text></View>
+          <View style={styles.row}><Ionicons name="mail-outline" size={20} color="#0e7c36" /><Text style={styles.rowText}>  kisanoneoffice@gmail.com</Text></View>
           <View style={[styles.row, { alignItems: 'flex-start' }]}>
-            <Ionicons name="location-outline" size={20} color="#2E7D32" />
+            <Ionicons name="location-outline" size={20} color="#0e7c36" />
             <Text style={[styles.rowText, { flex: 1 }]}>  Kalchuri LNCT Incubation Centre (KLIC), Lakshmi Narain College of Technology (LNCT Group), Kalchuri Nagar, Raisen Road, Bhopal – 462022, Madhya Pradesh, India</Text>
           </View>
 
@@ -72,7 +72,7 @@ export default function HelpScreen() {
           {faqs.map((f, idx) => (
             <View key={idx} style={styles.faqItem}>
               <View style={styles.faqQRow}>
-                <Ionicons name="help-circle-outline" size={18} color="#2E7D32" />
+                <Ionicons name="help-circle-outline" size={18} color="#0e7c36" />
                 <Text style={styles.faqQ}>{f.q}</Text>
               </View>
               <Text style={styles.faqA}>{f.a}</Text>
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 40,
     paddingBottom: 12,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
   },
   backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   },
   contactCard: {
     borderLeftWidth: 4,
-    borderLeftColor: '#2E7D32',
+    borderLeftColor: '#0e7c36',
   },
   faqCard: {
     borderLeftWidth: 4,
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 10,
   },
-  callBtn: { backgroundColor: '#2E7D32' },
+  callBtn: { backgroundColor: '#0e7c36' },
   emailBtn: { backgroundColor: '#2563EB' },
   mapBtn: { backgroundColor: '#F59E0B' },
   actionText: { color: '#FFFFFF', fontWeight: '700', marginLeft: 6 },

@@ -1270,7 +1270,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} {...panResponder.panHandlers}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor="#0e7c36" translucent={false} />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets?.top || 0, 10) + 12 }]}>
@@ -1943,7 +1943,7 @@ export default function HomeScreen() {
             </View>
             {notificationsLoading ? (
               <View style={styles.notificationsLoader}>
-                <ActivityIndicator size="small" color="#2E7D32" />
+                <ActivityIndicator size="small" color="#0e7c36" />
               </View>
             ) : notifications.length === 0 ? (
               <View style={styles.notificationsEmptyContainer}>
@@ -2084,19 +2084,19 @@ export default function HomeScreen() {
 
             <View style={styles.drawerMenu}>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('MyProfile'); }}>
-                <Ionicons name="person-outline" size={20} color="#2E7D32" />
+                <Ionicons name="person-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>My Profile</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('Cart'); }}>
-                <Ionicons name="cart-outline" size={20} color="#2E7D32" />
+                <Ionicons name="cart-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>Cart</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('Help'); }}>
-                <Ionicons name="help-circle-outline" size={20} color="#2E7D32" />
+                <Ionicons name="help-circle-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>Help</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('LanguageSelect'); }}>
-                <Ionicons name="language-outline" size={20} color="#2E7D32" />
+                <Ionicons name="language-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>Language</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.drawerItem, { marginTop: 12 }]} onPress={() => { closeDrawer(); handleLogout(); }}>
@@ -2120,7 +2120,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingTop: 40,
     paddingBottom: 20,
     paddingHorizontal: 16,
@@ -2355,7 +2355,7 @@ const styles = StyleSheet.create({
   },
   dropdownProductCardPrice: {
     fontSize: 14,
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '800',
     textAlign: 'center',
   },
@@ -2544,7 +2544,7 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
     textAlign: 'center',
     marginBottom: 4,
   },
@@ -2580,7 +2580,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   shopNowButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -2631,7 +2631,7 @@ const styles = StyleSheet.create({
   viewAllBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   productCard: {
     width: 180,
@@ -2793,8 +2793,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sizePickerOptionSelected: {
-    backgroundColor: '#2E7D32',
-    borderColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
+    borderColor: '#0e7c36',
   },
   sizePickerOptionText: {
     fontSize: 14,
@@ -2873,7 +2873,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   addToCartButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -2905,7 +2905,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2945,7 +2945,7 @@ const styles = StyleSheet.create({
     color: '#999999',
   },
   postButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

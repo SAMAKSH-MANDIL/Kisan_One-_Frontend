@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   proceedButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',

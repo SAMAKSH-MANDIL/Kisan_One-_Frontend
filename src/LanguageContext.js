@@ -1,9 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTranslation } from './translations';
 
 const LanguageContext = createContext();
+const LANGUAGE_STORAGE_KEY = '@kisanone_language';
 
 export const languages = [
   { code: 'en', name: 'English', native: 'English' },
@@ -53,10 +55,14 @@ export const LanguageProvider = ({ children }) => {
 
   const loadLanguage = async () => {
     try {
-      // Check for temp language from LanguageSelection screen
+      // First, check for temp language from LanguageSelection screen
       if (global._tempLanguage) {
-        setCurrentLanguage(global._tempLanguage);
+        const tempLang = global._tempLanguage;
+        setCurrentLanguage(tempLang);
+        // Save to AsyncStorage immediately
+        await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, tempLang);
         global._tempLanguage = null;
+        return;
       }
 
       // Then try Firestore for logged-in users
@@ -67,11 +73,22 @@ export const LanguageProvider = ({ children }) => {
           const data = doc.data() || {};
           if (data.language) {
             setCurrentLanguage(data.language);
+            // Sync to AsyncStorage
+            await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, data.language);
+            return;
           }
         }
       }
+
+      // For non-logged-in users or if Firestore doesn't have language, load from AsyncStorage
+      const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (savedLanguage) {
+        setCurrentLanguage(savedLanguage);
+      }
     } catch (error) {
       console.error('Error loading language:', error);
+      // Fallback to default language
+      setCurrentLanguage('en');
     }
   };
 
@@ -80,7 +97,10 @@ export const LanguageProvider = ({ children }) => {
       // Update state immediately
       setCurrentLanguage(languageCode);
 
-      // Save to Firestore for logged-in users
+      // Always save to AsyncStorage (works for both logged-in and non-logged-in users)
+      await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, languageCode);
+
+      // Also save to Firestore for logged-in users
       const user = auth().currentUser;
       if (user) {
         await firestore().collection('users').doc(user.uid).update({

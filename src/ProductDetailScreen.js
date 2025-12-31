@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeIndicator: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     width: 24,
   },
   discountBadge: {
@@ -641,8 +641,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   packChipActive: {
-    backgroundColor: '#2E7D32',
-    borderColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
+    borderColor: '#0e7c36',
   },
   packChipText: {
     fontSize: 13,
@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
   },
   addToCartButton: {
     flex: 1,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     borderRadius: 12,
     paddingVertical: 8,
   },

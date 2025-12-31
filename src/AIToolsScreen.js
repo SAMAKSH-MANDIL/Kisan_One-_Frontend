@@ -36,7 +36,7 @@ import { generateGeminiReply, setGeminiApiKey } from './services/gemini';
 
 export default function AIToolsScreen() {
   const navigation = useNavigation();
-  const { getVoiceLocale } = useLanguage();
+  const { getVoiceLocale, t } = useLanguage();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -72,7 +72,7 @@ export default function AIToolsScreen() {
   // Chat modal state
   const [chatVisible, setChatVisible] = useState(false);
   const [chatMessages, setChatMessages] = useState([
-    { role: 'model', text: 'Hi! Ask me anything related to crops, pests, weather, or inputs.' },
+    { role: 'model', text: t('askMeAnything') },
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -962,7 +962,7 @@ export default function AIToolsScreen() {
               <Text style={[styles.locationText, locationEnabled ? styles.locationTextEnabled : styles.locationTextDisabled]}>
                 {locationName}
               </Text>
-              <Text style={styles.locationSubText}>{locationEnabled ? 'Tap to refresh location' : 'Tap to enable location'}</Text>
+              <Text style={styles.locationSubText}>{locationEnabled ? t('tapToRefreshLocation') : t('tapToEnableLocation')}</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -982,7 +982,7 @@ export default function AIToolsScreen() {
         isKeyboardVisible ? styles.contentWhenKeyboard : null,
       ]}>
         {/* Question */}
-        <Text style={styles.question}>What can I help with?</Text>
+        <Text style={styles.question}>{t('whatCanIHelpWith')}</Text>
 
         {/* Tool Cards */}
         <View style={styles.toolsContainer}>
@@ -1000,7 +1000,7 @@ export default function AIToolsScreen() {
                   console.log('Error loading Crop Doctor image:', error);
                 }}
               />
-              <Text style={styles.toolNamePill} numberOfLines={1}>Crop Doctor</Text>
+              <Text style={styles.toolNamePill} numberOfLines={1}>{t('cropDoctor')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -1015,7 +1015,7 @@ export default function AIToolsScreen() {
                   console.log('Error loading Crop Recommendation image:', error);
                 }}
               />
-              <Text style={styles.toolNamePill} numberOfLines={1}>Crop Recommendation</Text>
+              <Text style={styles.toolNamePill} numberOfLines={1}>{t('cropRecommendation')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -1030,7 +1030,7 @@ export default function AIToolsScreen() {
                   setShowMoreExpanded(true);
                 }}
               >
-                <Text style={styles.toolNamePill} numberOfLines={1}>More</Text>
+                <Text style={styles.toolNamePill} numberOfLines={1}>{t('more')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1266,19 +1266,19 @@ export default function AIToolsScreen() {
 
             <View style={styles.drawerMenu}>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('MyProfile'); }}>
-                <Ionicons name="person-outline" size={20} color="#2E7D32" />
+                <Ionicons name="person-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>My Profile</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('Cart'); }}>
-                <Ionicons name="cart-outline" size={20} color="#2E7D32" />
+                <Ionicons name="cart-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>Cart</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('Help'); }}>
-                <Ionicons name="help-circle-outline" size={20} color="#2E7D32" />
+                <Ionicons name="help-circle-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>Help</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.drawerItem} onPress={() => { closeDrawer(); navigation.navigate('LanguageSelect'); }}>
-                <Ionicons name="language-outline" size={20} color="#2E7D32" />
+                <Ionicons name="language-outline" size={20} color="#0e7c36" />
                 <Text style={styles.drawerItemText}>Language</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.drawerItem, { marginTop: 12 }]} onPress={() => { closeDrawer(); handleLogout(); }}>
@@ -1859,7 +1859,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     alignItems: 'center',
     justifyContent: 'center',
   },

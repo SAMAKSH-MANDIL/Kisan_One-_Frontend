@@ -33,7 +33,7 @@ export default function SplashScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor="#0e7c36" translucent={false} />
       
       {/* Background with gradient effect */}
       <View style={styles.backgroundGradient} />
@@ -64,7 +64,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     opacity: 0.9,
   },
   logoContainer: {

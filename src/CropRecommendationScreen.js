@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from './LanguageContext';
 
 export default function CropRecommendationScreen({ navigation }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [topCrops, setTopCrops] = useState([]);
   const [fieldInfo, setFieldInfo] = useState({
@@ -131,12 +133,12 @@ export default function CropRecommendationScreen({ navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crop Recommendation</Text>
+          <Text style={styles.headerTitle}>{t('cropRecommendationTitle')}</Text>
           <View style={{ width: 44 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#22A06B" />
-          <Text style={styles.loadingText}>Analyzing your field...</Text>
+          <Text style={styles.loadingText}>{t('analyzingYourField')}</Text>
         </View>
       </SafeAreaView>
     );

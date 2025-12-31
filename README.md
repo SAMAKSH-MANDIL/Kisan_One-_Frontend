@@ -31,13 +31,13 @@ This guide provides detailed instructions for placing images and assets in the K
 
 **Logo**: Same as splash screen
 - **Size**: 80x80px
-- **Background**: Green circular background (#2E7D32)
+- **Background**: Green circular background (#0e7c36)
 
 ### 3. Login & OTP Screens (`src/Login.js`)
 
 **Logo**: Same as splash screen
 - **Size**: 80x80px
-- **Background**: Green circular background (#2E7D32)
+- **Background**: Green circular background (#0e7c36)
 
 ### 4. Home Screen (`src/HomeScreen.js`)
 
@@ -270,7 +270,7 @@ This guide provides detailed instructions for placing images and assets in the K
 
 2. **Create Post**: `create-post-icon.png` (24x24px)
    - Pencil or plus symbol
-   - Green background (#2E7D32)
+   - Green background (#0e7c36)
 
 ## Image Specifications Summary
 
@@ -285,7 +285,7 @@ This guide provides detailed instructions for placing images and assets in the K
 - **@3x**: 3x resolution for very high-DPI screens
 
 ### Color Scheme
-- **Primary Green**: #2E7D32
+- **Primary Green**: #0e7c36
 - **Accent Orange**: #FF6B6B, #FFA726
 - **Background White**: #FFFFFF
 - **Text Dark**: #333333
@@ -370,7 +370,7 @@ assets/
 
 ## Color Palette Reference
 
-- **Primary Green**: #2E7D32 (Headers, buttons, active states)
+- **Primary Green**: #0e7c36 (Headers, buttons, active states)
 - **Light Green**: #E8F5E8 (Backgrounds, accents)
 - **Orange**: #FF6B6B, #FFA726 (Discounts, highlights)
 - **White**: #FFFFFF (Backgrounds, cards)

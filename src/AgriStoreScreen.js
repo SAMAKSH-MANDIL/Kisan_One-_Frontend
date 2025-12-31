@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   activeTab: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
   },
   tabText: {
     fontSize: 14,
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     color: '#666666',
   },
   viewBrandButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     color: '#999999',
   },
   shopNowButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 6,
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   currentPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2E7D32',
+    color: '#0e7c36',
     marginRight: 8,
   },
   originalPrice: {
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   addToCartButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   },
   checkoutButton: {
     flex: 1,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',

@@ -18,6 +18,7 @@ import auth from "@react-native-firebase/auth";
 import firestore from "@react-native-firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguage } from './LanguageContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -33,6 +34,7 @@ export default function Login() {
     const navigation = useNavigation();
     const otpRefs = useRef([]);
     const insets = useSafeAreaInsets();
+    const { t } = useLanguage();
 
     const authInstance = useMemo(() => auth(), []);
     const firestoreInstance = useMemo(() => firestore(), []);
@@ -285,12 +287,12 @@ export default function Login() {
                             />
                         </View>
                         <Text style={styles.welcomeText}>
-                            {!confirm ? "Welcome to Kisan One" : "Verify Your Number"}
+                            {!confirm ? t('welcomeToKisanOne') : t('verifyYourNumber')}
                         </Text>
                         <Text style={styles.subtitleText}>
                             {!confirm 
-                                ? "Enter your phone number to continue" 
-                                : "Enter the verification code sent to your phone"
+                                ? t('enterPhoneNumber')
+                                : t('enterVerificationCode')
                             }
                         </Text>
                     </View>
@@ -299,7 +301,7 @@ export default function Login() {
                         {!confirm ? (
                             <>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.inputLabel}>Phone Number</Text>
+                                    <Text style={styles.inputLabel}>{t('phoneNumber')}</Text>
                                     <View style={styles.phoneInputContainer}>
                                         <View style={styles.countryCode}>
                                             <Text style={styles.countryCodeText}>+91</Text>
@@ -313,7 +315,7 @@ export default function Login() {
                                             }}
                                             keyboardType="phone-pad"
                                             autoFocus
-                                            placeholder="Enter 10-digit number"
+                                            placeholder={t('enter10DigitNumber')}
                                             placeholderTextColor="#999999"
                                             autoCorrect={false}
                                             autoCapitalize="none"
@@ -329,7 +331,7 @@ export default function Login() {
                                     disabled={loading}
                                 >
                                     <Text style={styles.buttonText}>
-                                        {loading ? "Sending..." : "Send Verification Code"}
+                                        {loading ? t('sending') : t('sendVerificationCode')}
                                     </Text>
                                 </TouchableOpacity>
 
@@ -337,13 +339,13 @@ export default function Login() {
                                     onPress={() => navigation.navigate('LanguageSelection')}
                                     style={styles.backButton}
                                 >
-                                    <Text style={styles.backButtonText}>Back to Language Selection</Text>
+                                    <Text style={styles.backButtonText}>{t('backToLanguageSelection')}</Text>
                                 </TouchableOpacity>
                             </>
                         ) : (
                             <>
                                 <View style={styles.inputContainer}>
-                                    <Text style={styles.inputLabel}>Verification Code</Text>
+                                    <Text style={styles.inputLabel}>{t('verificationCode')}</Text>
                                     <View style={styles.otpContainer}>
                                         {[0, 1, 2, 3, 4, 5].map((index) => (
                                             <TextInput
@@ -371,7 +373,7 @@ export default function Login() {
                                     disabled={loading}
                                 >
                                     <Text style={styles.buttonText}>
-                                        {loading ? "Verifying..." : "Verify Code"}
+                                        {loading ? t('verifying') : t('verifyCode')}
                                     </Text>
                                 </TouchableOpacity>
 
@@ -382,7 +384,7 @@ export default function Login() {
                                     }}
                                     style={styles.resendButton}
                                 >
-                                    <Text style={styles.resendButtonText}>Resend Code</Text>
+                                    <Text style={styles.resendButtonText}>{t('resendCode')}</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -390,7 +392,7 @@ export default function Login() {
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>
-                            By continuing, you agree to our Terms of Service and Privacy Policy
+                            {t('termsAndPrivacy')}
                         </Text>
                     </View>
                 </ScrollView>
@@ -429,7 +431,7 @@ const styles = StyleSheet.create({
         width: Math.min(scale(80), screenWidth * 0.2),
         height: Math.min(scale(80), screenWidth * 0.2),
         borderRadius: Math.min(scale(40), screenWidth * 0.1),
-        backgroundColor: '#2E7D32',
+        backgroundColor: '#0e7c36',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: verticalScale(12),
@@ -501,7 +503,7 @@ const styles = StyleSheet.create({
     countryCodeText: {
         fontSize: moderateScale(15),
         fontWeight: '600',
-        color: '#2E7D32',
+        color: '#0e7c36',
     },
     phoneInput: {
         flex: 1,
@@ -534,18 +536,18 @@ const styles = StyleSheet.create({
         minWidth: 40,
     },
     otpBoxFilled: {
-        borderColor: '#2E7D32',
+        borderColor: '#0e7c36',
         backgroundColor: '#E8F5E8',
     },
     button: {
-        backgroundColor: '#2E7D32',
+        backgroundColor: '#0e7c36',
         height: Math.max(verticalScale(50), 50),
         borderRadius: moderateScale(12),
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: verticalScale(12),
         paddingHorizontal: scale(16),
-        shadowColor: '#2E7D32',
+        shadowColor: '#0e7c36',
         shadowOffset: {
             width: 0,
             height: 4,
@@ -569,7 +571,7 @@ const styles = StyleSheet.create({
         paddingVertical: verticalScale(8),
     },
     resendButtonText: {
-        color: '#2E7D32',
+        color: '#0e7c36',
         fontSize: moderateScale(15),
         fontWeight: '500',
     },
@@ -579,7 +581,7 @@ const styles = StyleSheet.create({
         paddingVertical: verticalScale(8),
     },
     backButtonText: {
-        color: '#2E7D32',
+        color: '#0e7c36',
         fontSize: moderateScale(15),
         fontWeight: '500',
         textDecorationLine: 'underline',

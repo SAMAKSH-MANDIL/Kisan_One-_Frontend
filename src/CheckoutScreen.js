@@ -183,7 +183,7 @@ export default function CheckoutScreen() {
             style={styles.addAddressButton}
             onPress={handleAddNewAddress}
           >
-            <Ionicons name="add-circle-outline" size={20} color="#2E7D32" />
+            <Ionicons name="add-circle-outline" size={20} color="#0e7c36" />
             <Text style={styles.addAddressText}> Add new address</Text>
           </TouchableOpacity>
 
@@ -207,7 +207,7 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
               {selectedAddress?.id === address.id && (
-                <Ionicons name="checkmark-circle" size={24} color="#2E7D32" />
+                <Ionicons name="checkmark-circle" size={24} color="#0e7c36" />
               )}
             </TouchableOpacity>
           ))}
@@ -350,7 +350,7 @@ export default function CheckoutScreen() {
               onPress={() => setTermsAccepted(!termsAccepted)}
             >
               {termsAccepted && (
-                <Ionicons name="checkmark" size={18} color="#2E7D32" />
+                <Ionicons name="checkmark" size={18} color="#0e7c36" />
               )}
             </TouchableOpacity>
             <Text style={styles.termsText}>I accept the terms and conditions</Text>
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: '#0e7c36',
     marginRight: 8,
   },
   productQuantityPrice: {
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   billValueTotal: {
     fontSize: 18,
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '700',
   },
   footer: {
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   proceedButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 10,
@@ -615,11 +615,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     borderStyle: 'dashed',
   },
   addAddressText: {
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addressCardSelected: {
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     backgroundColor: '#F0F9F0',
   },
   addressContent: {
@@ -667,7 +667,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     borderRadius: 4,
     marginRight: 12,
     alignItems: 'center',

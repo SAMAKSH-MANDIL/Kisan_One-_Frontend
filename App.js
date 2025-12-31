@@ -72,7 +72,7 @@ function MainTabNavigator() {
           // Reduce gap between icon and label for a tighter stack
           marginTop: responsiveSpacing(-5, 0.4),
         },
-        tabBarActiveTintColor: '#2E7D32',
+        tabBarActiveTintColor: '#0e7c36',
         tabBarInactiveTintColor: '#666666',
       }}
     >
@@ -112,7 +112,7 @@ function MainTabNavigator() {
         options={{
           tabBarLabel: t('info'),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="information-circle-outline" size={ms(20, 0.4)} color={color} />
+            <Ionicons name="newspaper-outline" size={ms(20, 0.4)} color={color} />
           ),
         }}
       />

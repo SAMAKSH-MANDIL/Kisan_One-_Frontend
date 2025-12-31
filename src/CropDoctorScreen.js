@@ -13,8 +13,10 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from './LanguageContext';
 
 export default function CropDoctorScreen({ navigation }) {
+  const { t } = useLanguage();
   const [imageUri, setImageUri] = useState(null);
   const [showReport, setShowReport] = useState(false);
   const [reportData, setReportData] = useState(null);
@@ -31,7 +33,7 @@ export default function CropDoctorScreen({ navigation }) {
       
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission required', 'Camera permission is needed.');
+        Alert.alert(t('permissionRequired'), t('cameraPermissionNeeded'));
         return;
       }
       
@@ -72,7 +74,7 @@ export default function CropDoctorScreen({ navigation }) {
       
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission required', 'Gallery permission is needed.');
+        Alert.alert(t('permissionRequired'), t('galleryPermissionNeeded'));
         return;
       }
       
@@ -104,7 +106,7 @@ export default function CropDoctorScreen({ navigation }) {
 
   const analyzeImage = async () => {
     if (!imageUri) {
-      Alert.alert('No image selected', 'Please capture or select an image first.');
+      Alert.alert(t('noImageSelected'), t('pleaseCaptureOrSelect'));
       return;
     }
 
@@ -142,8 +144,8 @@ export default function CropDoctorScreen({ navigation }) {
 
       const data = await response.json();
       const normalized = {
-        crop_name: data?.crop_name || 'Unknown crop',
-        crop_disease: data?.crop_disease || 'Unknown disease',
+        crop_name: data?.crop_name || t('unknownCrop'),
+        crop_disease: data?.crop_disease || t('unknownDisease'),
         crop_disease_symptoms: Array.isArray(data?.crop_disease_symptoms) ? data.crop_disease_symptoms : [],
         crop_disease_cause: Array.isArray(data?.crop_disease_cause) ? data.crop_disease_cause : [],
         crop_disease_management: Array.isArray(data?.crop_disease_management) ? data.crop_disease_management : [],
@@ -226,15 +228,15 @@ export default function CropDoctorScreen({ navigation }) {
       >
         {/* AI-Powered Section */}
         <View style={styles.heroSection}>
-          <Text style={styles.title}>AI-Powered Crop Disease Detection</Text>
+          <Text style={styles.title}>{t('aiPoweredCropDiseaseDetection')}</Text>
           <Text style={styles.subtitle}>
-            Take a photo of your crop leaves and get instant disease diagnosis with treatment recommendations.
+            {t('cropDiseaseDetectionDesc')}
           </Text>
         </View>
 
         {/* Step 1: Capture Image Section */}
         <View style={styles.captureSection}>
-          <Text style={styles.sectionTitle}>Step 1: Capture Image</Text>
+          <Text style={styles.sectionTitle}>{t('step1CaptureImage')}</Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity 
               style={[styles.cta, styles.cameraBtn]} 
@@ -242,7 +244,7 @@ export default function CropDoctorScreen({ navigation }) {
               activeOpacity={0.8}
             >
               <Ionicons name="camera" size={24} color="#FFFFFF" />
-              <Text style={styles.ctaText}>Camera</Text>
+              <Text style={styles.ctaText}>{t('camera')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.cta, styles.galleryBtn]} 
@@ -250,7 +252,7 @@ export default function CropDoctorScreen({ navigation }) {
               activeOpacity={0.8}
             >
               <Ionicons name="images" size={24} color="#FFFFFF" />
-              <Text style={styles.ctaText}>Gallery</Text>
+              <Text style={styles.ctaText}>{t('gallery')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -288,7 +290,7 @@ export default function CropDoctorScreen({ navigation }) {
                 ) : (
                   <>
                     <Ionicons name="analytics" size={22} color="#FFFFFF" />
-                    <Text style={styles.generateReportBtnText}>Analyze & Generate Report</Text>
+                    <Text style={styles.generateReportBtnText}>{t('analyzeImage')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -299,7 +301,7 @@ export default function CropDoctorScreen({ navigation }) {
                 {/* Report Header with Badge */}
                 <View style={styles.reportHeader}>
                   <View style={styles.reportTitleContainer}>
-                    <Ionicons name="document-text" size={28} color="#2E7D32" />
+                    <Ionicons name="document-text" size={28} color="#0e7c36" />
                     <Text style={styles.reportTitle}>Diagnosis Report</Text>
                   </View>
                   <View style={styles.confidenceBadge}>
@@ -313,15 +315,15 @@ export default function CropDoctorScreen({ navigation }) {
                 {/* Key Information Cards */}
                 <View style={styles.infoCardsRow}>
                   <View style={styles.infoCard}>
-                    <Ionicons name="leaf-outline" size={20} color="#2E7D32" />
-                    <Text style={styles.infoCardLabel}>Crop</Text>
+                    <Ionicons name="leaf-outline" size={20} color="#0e7c36" />
+                    <Text style={styles.infoCardLabel}>{t('cropName')}</Text>
                     <Text style={styles.infoCardValue} numberOfLines={2}>
                       {reportData.crop_name}
                     </Text>
                   </View>
                   <View style={styles.infoCard}>
                     <Ionicons name="warning" size={20} color="#EF4444" />
-                    <Text style={styles.infoCardLabel}>Disease</Text>
+                    <Text style={styles.infoCardLabel}>{t('disease')}</Text>
                     <Text style={styles.infoCardValue} numberOfLines={2}>
                       {reportData.crop_disease}
                     </Text>
@@ -330,10 +332,10 @@ export default function CropDoctorScreen({ navigation }) {
 
                 {/* Report Sections */}
                 <View style={styles.reportContent}>
-                  {renderListSection('Symptoms', reportData.crop_disease_symptoms)}
-                  {renderListSection('Cause', reportData.crop_disease_cause)}
-                  {renderListSection('Management', reportData.crop_disease_management)}
-                  {renderListSection('Prevention', reportData.crop_disease_prevention)}
+                  {renderListSection(t('symptoms'), reportData.crop_disease_symptoms)}
+                  {renderListSection(t('cause'), reportData.crop_disease_cause)}
+                  {renderListSection(t('management'), reportData.crop_disease_management)}
+                  {renderListSection(t('prevention'), reportData.crop_disease_prevention)}
                   {renderStepsSection('Management Steps', reportData.crop_disease_management_steps)}
                 </View>
               </View>
@@ -454,7 +456,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   cameraBtn: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
   },
   galleryBtn: {
     backgroundColor: '#0284C7',
@@ -503,11 +505,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
-    shadowColor: '#2E7D32',
+    shadowColor: '#0e7c36',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -560,7 +562,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -610,7 +612,7 @@ const styles = StyleSheet.create({
   reportLabel: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: '#0e7c36',
     marginBottom: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -623,7 +625,7 @@ const styles = StyleSheet.create({
   },
   treatmentBullet: {
     fontSize: 18,
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '700',
     marginTop: 2,
   },
@@ -643,7 +645,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,

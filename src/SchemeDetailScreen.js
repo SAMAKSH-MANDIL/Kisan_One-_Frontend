@@ -21,7 +21,7 @@ export default function SchemeDetailScreen({ route, navigation }) {
   if (!scheme) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
+        <StatusBar barStyle="light-content" backgroundColor="#0e7c36" />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Scheme information not found</Text>
           <TouchableOpacity
@@ -47,7 +47,7 @@ export default function SchemeDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
+      <StatusBar barStyle="light-content" backgroundColor="#0e7c36" />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets?.top || 0, 10) + 12 }] }>
@@ -68,14 +68,14 @@ export default function SchemeDetailScreen({ route, navigation }) {
       >
         {/* Scheme Name */}
         <View style={styles.nameContainer}>
-          <MaterialIcons name="policy" size={32} color="#2E7D32" />
+          <MaterialIcons name="policy" size={32} color="#0e7c36" />
           <Text style={styles.schemeName}>{scheme.name}</Text>
         </View>
 
         {/* State Badge */}
         {scheme.state && (
           <View style={styles.stateBadge}>
-            <Ionicons name="location" size={16} color="#2E7D32" />
+            <Ionicons name="location" size={16} color="#0e7c36" />
             <Text style={styles.stateText}>{scheme.state}</Text>
           </View>
         )}
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingTop: 40,
     paddingBottom: 16,
     paddingHorizontal: 20,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   stateText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   section: {
     backgroundColor: '#FFFFFF',
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2E7D32',
+    color: '#0e7c36',
     marginBottom: 12,
   },
   sectionContent: {
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   websiteButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     borderRadius: 10,
     padding: 16,
     flexDirection: 'row',
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

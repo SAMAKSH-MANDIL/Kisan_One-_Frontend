@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,22 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import { languages } from './LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { languages, useLanguage } from './LanguageContext';
+
+const LANGUAGE_STORAGE_KEY = '@kisanone_language';
 
 export default function LanguageSelection() {
   const navigation = useNavigation();
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const { changeLanguage, t, currentLanguage } = useLanguage();
+  const [selectedLanguage, setSelectedLanguage] = useState(currentLanguage || 'en');
+  
+  // Update selected language when currentLanguage changes
+  useEffect(() => {
+    if (currentLanguage) {
+      setSelectedLanguage(currentLanguage);
+    }
+  }, [currentLanguage]);
 
   const handleLanguageSelect = (languageCode) => {
     setSelectedLanguage(languageCode);
@@ -25,20 +36,22 @@ export default function LanguageSelection() {
   const handleContinue = async () => {
     // Save language preference before navigating
     try {
-      // Save to Firestore if user is already logged in
+      // Save to AsyncStorage immediately
+      await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, selectedLanguage);
+      
+      // Update language context
+      await changeLanguage(selectedLanguage);
+      
+      // Also save to Firestore if user is already logged in
       const user = auth().currentUser;
       if (user) {
         await firestore().collection('users').doc(user.uid).update({
           language: selectedLanguage,
         });
       } else {
-        // For first-time users, save in a temp location or pass via navigation params
-        // The LanguageProvider will load it once user logs in
+        // For non-logged-in users, set temp language for immediate effect
+        global._tempLanguage = selectedLanguage;
       }
-      
-      // Language will be saved by LanguageProvider when user logs in
-      // For now, pass via navigation state or global variable
-      global._tempLanguage = selectedLanguage;
     } catch (error) {
       console.error('Error saving language:', error);
     }
@@ -66,8 +79,8 @@ export default function LanguageSelection() {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.welcomeText}>Choose Your Language</Text>
-          <Text style={styles.subtitleText}>अपनी भाषा चुनें</Text>
+          <Text style={styles.welcomeText}>{t('chooseLanguage')}</Text>
+          <Text style={styles.subtitleText}>{t('chooseLanguage')}</Text>
         </View>
 
         {/* Language Options */}
@@ -105,8 +118,7 @@ export default function LanguageSelection() {
       {/* Sticky Continue Button */}
       <View style={styles.stickyBar}>
         <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-          <Text style={styles.continueButtonText}>Continue</Text>
-          <Text style={styles.continueButtonText}>जारी रखें</Text>
+          <Text style={styles.continueButtonText}>{t('continue')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -131,7 +143,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
@@ -182,7 +194,7 @@ const styles = StyleSheet.create({
   },
   selectedLanguage: {
     backgroundColor: '#E8F5E8',
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
   },
   languageText: {
     flex: 1,
@@ -197,14 +209,14 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   selectedLanguageText: {
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '600',
   },
   checkmark: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -230,11 +242,11 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
   },
   continueButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#2E7D32',
+    shadowColor: '#0e7c36',
     shadowOffset: {
       width: 0,
       height: 4,

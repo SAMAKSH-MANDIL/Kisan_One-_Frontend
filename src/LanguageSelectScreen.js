@@ -6,11 +6,11 @@ import { useLanguage, languages } from './LanguageContext';
 
 export default function LanguageSelectScreen() {
   const navigation = useNavigation();
-  const { currentLanguage, changeLanguage } = useLanguage();
+  const { currentLanguage, changeLanguage, t } = useLanguage();
 
   const handleLanguageSelect = async (lang) => {
     await changeLanguage(lang.code);
-    Alert.alert('Language Changed', `${lang.name} has been set as your preferred language.`, [
+    Alert.alert(t('languageChanged'), `${lang.name} ${t('languageSet')}`, [
       { text: 'OK', onPress: () => navigation.goBack() }
     ]);
   };
@@ -23,15 +23,15 @@ export default function LanguageSelectScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Ionicons name="globe" size={24} color="#FFFFFF" />
-          <Text style={styles.headerTitle}>Select Language</Text>
+          <Text style={styles.headerTitle}>{t('selectLanguage')}</Text>
         </View>
         <View style={{ width: 44 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Available Languages</Text>
-          <Text style={styles.sectionSubtitle}>Choose your preferred language</Text>
+          <Text style={styles.sectionTitle}>{t('availableLanguages')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('choosePreferredLanguage')}</Text>
         </View>
         {languages.map((lang) => (
           <TouchableOpacity
@@ -46,7 +46,7 @@ export default function LanguageSelectScreen() {
             </View>
             {currentLanguage === lang.code && (
               <View style={styles.checkContainer}>
-                <Ionicons name="checkmark-circle" size={26} color="#2E7D32" />
+                <Ionicons name="checkmark-circle" size={26} color="#0e7c36" />
               </View>
             )}
           </TouchableOpacity>
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 40,
     paddingBottom: 16,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 2,
     borderColor: '#E8F5E9',
-    shadowColor: '#2E7D32',
+    shadowColor: '#0e7c36',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
     borderWidth: 2,
     borderColor: '#E8F5E9',
-    shadowColor: '#2E7D32',
+    shadowColor: '#0e7c36',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectedLangCard: {
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     backgroundColor: '#F1F8F4',
   },
 });

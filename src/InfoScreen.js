@@ -15,8 +15,10 @@ import {
   FlatList
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { useLanguage } from './LanguageContext';
 
 export default function InfoScreen({ navigation }) {
+  const { t } = useLanguage();
 
   const [countries, setcountries] = useState(Country.getAllCountries);
   const [states, setStates] = useState([]);
@@ -34,7 +36,7 @@ export default function InfoScreen({ navigation }) {
   const [showCityInput, setShowCityInput] = useState(false);
   const [showSchemeStateInput, setShowSchemeStateInput] = useState(false);
 
-  const sections = ['Mandi Price', 'Schemes', 'Post'];
+  const sections = [t('mandiPrice'), t('schemes'), t('post')];
   // Complete India States and Cities Data
   const indiaStatesAndCities = {
     "Andhra Pradesh": [
@@ -568,7 +570,7 @@ export default function InfoScreen({ navigation }) {
 
       <View style={styles.inputCard}>
         <View style={styles.inputHeader}>
-          <MaterialIcons name="location-on" size={20} color="#2E7D32" />
+          <MaterialIcons name="location-on" size={20} color="#0e7c36" />
           <Text style={styles.inputLabel}>Select Location</Text>
         </View>
         <View style={styles.locationRow}>
@@ -611,7 +613,7 @@ export default function InfoScreen({ navigation }) {
       {selectedState && selectedCity && (
         <>
           <View style={styles.locationInfo}>
-            <MaterialIcons name="place" size={18} color="#2E7D32" />
+            <MaterialIcons name="place" size={18} color="#0e7c36" />
             <Text style={styles.locationInfoText}>
               Showing prices for {selectedCity}, {selectedState}
             </Text>
@@ -672,7 +674,7 @@ export default function InfoScreen({ navigation }) {
                   {item}
                 </Text>
                 {selectedState === item && (
-                  <Ionicons name="checkmark" size={20} color="#2E7D32" />
+                  <Ionicons name="checkmark" size={20} color="#0e7c36" />
                 )}
               </TouchableOpacity>
             )}
@@ -720,7 +722,7 @@ export default function InfoScreen({ navigation }) {
                   {item}
                 </Text>
                 {selectedCity === item && (
-                  <Ionicons name="checkmark" size={20} color="#2E7D32" />
+                  <Ionicons name="checkmark" size={20} color="#0e7c36" />
                 )}
               </TouchableOpacity>
             )}
@@ -766,7 +768,7 @@ export default function InfoScreen({ navigation }) {
                   {item}
                 </Text>
                 {selectedSchemeState === item && (
-                  <Ionicons name="checkmark" size={20} color="#2E7D32" />
+                  <Ionicons name="checkmark" size={20} color="#0e7c36" />
                 )}
               </TouchableOpacity>
             )}
@@ -847,14 +849,14 @@ export default function InfoScreen({ navigation }) {
               onPress={() => navigation?.navigate('SchemeDetail', { scheme })}
             >
               <View style={styles.schemeIconBg}>
-                <MaterialIcons name="policy" size={24} color="#2E7D32" />
+                <MaterialIcons name="policy" size={24} color="#0e7c36" />
               </View>
               <View style={styles.schemeContent}>
                 <Text style={styles.schemeName}>{scheme.name}</Text>
                 <Text style={styles.schemeDesc}>{scheme.desc}</Text>
                 <View style={styles.schemeStatus}>
                   <View style={styles.statusBadge}>
-                    <Ionicons name="location" size={12} color="#2E7D32" />
+                    <Ionicons name="location" size={12} color="#0e7c36" />
                     <Text style={styles.statusText}>{scheme.state}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color="#999999" />
@@ -887,7 +889,7 @@ export default function InfoScreen({ navigation }) {
           contentContainerStyle={styles.postScrollContent}
         >
           <View style={styles.updatesHeader}>
-            <MaterialIcons name="new-releases" size={24} color="#2E7D32" />
+            <MaterialIcons name="new-releases" size={24} color="#0e7c36" />
             <Text style={styles.updatesHeaderText}>Stay Updated</Text>
           </View>
 
@@ -899,7 +901,7 @@ export default function InfoScreen({ navigation }) {
             >
               <View style={styles.updateHeader}>
                 <View style={styles.updateIcon}>
-                  <MaterialIcons name="campaign" size={18} color="#2E7D32" />
+                  <MaterialIcons name="campaign" size={18} color="#0e7c36" />
                 </View>
                 <View style={styles.updateContent}>
                   <View style={styles.updateDateRow}>
@@ -922,7 +924,7 @@ export default function InfoScreen({ navigation }) {
             onPress={() => canGoPrevious && setCurrentPostPage(currentPostPage - 1)}
             disabled={!canGoPrevious}
           >
-            <Ionicons name="chevron-back" size={20} color={canGoPrevious ? "#2E7D32" : "#999999"} />
+            <Ionicons name="chevron-back" size={20} color={canGoPrevious ? "#0e7c36" : "#999999"} />
             <Text style={[styles.paginationButtonText, !canGoPrevious && styles.paginationButtonTextDisabled]}>
               Previous
             </Text>
@@ -940,7 +942,7 @@ export default function InfoScreen({ navigation }) {
             <Text style={[styles.paginationButtonText, !canGoNext && styles.paginationButtonTextDisabled]}>
               Next
             </Text>
-            <Ionicons name="chevron-forward" size={20} color={canGoNext ? "#2E7D32" : "#999999"} />
+            <Ionicons name="chevron-forward" size={20} color={canGoNext ? "#0e7c36" : "#999999"} />
           </TouchableOpacity>
         </View>
       </View>
@@ -949,20 +951,20 @@ export default function InfoScreen({ navigation }) {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'Mandi Price': return renderMandiPrice();
-      case 'Schemes': return renderSchemes();
-      case 'Post': return renderPost();
+      case t('mandiPrice'): return renderMandiPrice();
+      case t('schemes'): return renderSchemes();
+      case t('post'): return renderPost();
       default: return renderMandiPrice();
     }
   };
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2E7D32" translucent={false} />
+      <StatusBar barStyle="light-content" backgroundColor="#0e7c36" translucent={false} />
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Info</Text>
-        <Text style={styles.headerSubtitle}>App information and settings</Text>
+        <Text style={styles.headerTitle}>{t('info')}</Text>
+        <Text style={styles.headerSubtitle}>{t('appInformationAndSettings')}</Text>
       </View>
 
       {/* Tabs */}
@@ -1008,7 +1010,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     paddingTop: 40,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -1038,7 +1040,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   activeTab: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
   },
   tabText: {
     fontSize: 14,
@@ -1141,7 +1143,7 @@ const styles = StyleSheet.create({
     color: '#999999',
   },
   searchButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     borderRadius: 8,
     padding: 14,
     flexDirection: 'row',
@@ -1169,7 +1171,7 @@ const styles = StyleSheet.create({
   },
   locationInfoText: {
     fontSize: 14,
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '500',
   },
   priceHeader: {
@@ -1214,7 +1216,7 @@ const styles = StyleSheet.create({
   priceRange: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   // Modal Styles
   modalOverlay: {
@@ -1258,7 +1260,7 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   modalItemTextSelected: {
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '600',
   },
   // Category and Scheme Styles
@@ -1276,7 +1278,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   categoryButtonActive: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
   },
   categoryButtonText: {
     fontSize: 13,
@@ -1345,7 +1347,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   stateDropdownContainer: {
     marginBottom: 20,
@@ -1459,14 +1461,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     marginTop: 12,
     gap: 8,
   },
   viewMoreText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   postContainer: {
     flex: 1,
@@ -1501,7 +1503,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2E7D32',
+    borderColor: '#0e7c36',
     gap: 6,
   },
   paginationButtonDisabled: {
@@ -1510,7 +1512,7 @@ const styles = StyleSheet.create({
   paginationButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#0e7c36',
   },
   paginationButtonTextDisabled: {
     color: '#999999',

@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+import { useLanguage } from './LanguageContext';
 
 // Paste your STATE_CITY_DATA here
 const STATE_CITY_DATA = {
@@ -214,6 +215,7 @@ const STATE_CITY_DATA = {
 
 export default function MyProfileScreen() {
   const navigation = useNavigation();
+  const { t } = useLanguage();
   const user = auth().currentUser;
 
   const [name, setName] = useState('');
@@ -266,13 +268,13 @@ export default function MyProfileScreen() {
 
   const handleSave = async () => {
     if (!user) {
-      Alert.alert('Error', 'User not logged in. Please login again.');
+      Alert.alert(t('error'), t('userNotLoggedIn'));
       return;
     }
 
     // Validate required fields
     if (!name || !name.trim()) {
-      Alert.alert('Validation Error', 'Please enter your name.');
+      Alert.alert(t('validationError'), t('pleaseEnterName'));
       return;
     }
 
@@ -321,7 +323,7 @@ export default function MyProfileScreen() {
       // Try to save
       await userRef.set(profileData, { merge: true });
       
-      Alert.alert('Saved', 'Your profile has been updated.');
+      Alert.alert(t('saved'), t('profileUpdated'));
       navigation.goBack();
     } catch (e) {
       console.error('Save error:', e);
@@ -329,11 +331,11 @@ export default function MyProfileScreen() {
       console.error('Error message:', e?.message);
       
       // Provide more specific error messages
-      let errorMessage = 'Failed to save profile.';
-      let errorTitle = 'Error';
+      let errorMessage = t('failedToSaveProfile');
+      let errorTitle = t('error');
       
       if (e?.code === 'permission-denied') {
-        errorTitle = 'Permission Denied';
+        errorTitle = t('permissionDenied');
         errorMessage = 'Your Firestore security rules are blocking this operation.\n\n' +
           'Please update your Firestore rules in Firebase Console:\n' +
           '1. Go to Firebase Console → Firestore Database → Rules\n' +
@@ -341,14 +343,14 @@ export default function MyProfileScreen() {
           '3. Publish the rules\n\n' +
           'Or contact your administrator to fix the security rules.';
       } else if (e?.code === 'unavailable') {
-        errorTitle = 'Network Error';
-        errorMessage = 'Network error. Please check your internet connection and try again.';
+        errorTitle = t('networkError');
+        errorMessage = t('networkError');
       } else if (e?.code === 'deadline-exceeded') {
-        errorTitle = 'Timeout';
-        errorMessage = 'Request timeout. Please try again.';
+        errorTitle = t('timeout');
+        errorMessage = t('timeout');
       } else if (e?.code === 'unauthenticated') {
-        errorTitle = 'Authentication Error';
-        errorMessage = 'You are not logged in. Please login again.';
+        errorTitle = t('authenticationError');
+        errorMessage = t('youAreNotLoggedIn');
       } else if (e?.message) {
         errorMessage = `Error: ${e.message}`;
       }
@@ -370,7 +372,7 @@ export default function MyProfileScreen() {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select State/UT</Text>
+            <Text style={styles.modalTitle}>{t('selectStateUT')}</Text>
             <TouchableOpacity onPress={() => setShowStateModal(false)}>
               <Ionicons name="close" size={24} color="#333333" />
             </TouchableOpacity>
@@ -394,7 +396,7 @@ export default function MyProfileScreen() {
                   {item}
                 </Text>
                 {stateName === item && (
-                  <Ionicons name="checkmark" size={20} color="#2E7D32" />
+                  <Ionicons name="checkmark" size={20} color="#0e7c36" />
                 )}
               </TouchableOpacity>
             )}
@@ -417,7 +419,7 @@ export default function MyProfileScreen() {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              Select City - {stateName}
+              {t('selectCityState').replace('{state}', stateName)}
             </Text>
             <TouchableOpacity onPress={() => setShowCityModal(false)}>
               <Ionicons name="close" size={24} color="#333333" />
@@ -442,7 +444,7 @@ export default function MyProfileScreen() {
                   {item}
                 </Text>
                 {city === item && (
-                  <Ionicons name="checkmark" size={20} color="#2E7D32" />
+                  <Ionicons name="checkmark" size={20} color="#0e7c36" />
                 )}
               </TouchableOpacity>
             )}
@@ -459,7 +461,7 @@ export default function MyProfileScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Profile</Text>
+        <Text style={styles.headerTitle}>{t('myProfile')}</Text>
         <View style={{ width: 44 }} />
       </View>
 
@@ -472,44 +474,44 @@ export default function MyProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Name</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="Enter your name" style={styles.input} />
+          <Text style={styles.label}>{t('name')}</Text>
+          <TextInput value={name} onChangeText={setName} placeholder={t('name')} style={styles.input} />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>State</Text>
+          <Text style={styles.label}>{t('state')}</Text>
           <TouchableOpacity
             style={styles.dropdown}
             onPress={() => setShowStateModal(true)}
           >
             <Text style={[styles.dropdownText, !stateName && styles.placeholderText]}>
-              {stateName || 'Select State'}
+              {stateName || t('selectState')}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#666666" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>City</Text>
+          <Text style={styles.label}>{t('city')}</Text>
           <TouchableOpacity
             style={[styles.dropdown, !stateName && styles.dropdownDisabled]}
             onPress={() => stateName && setShowCityModal(true)}
             disabled={!stateName}
           >
             <Text style={[styles.dropdownText, !city && styles.placeholderText, !stateName && styles.disabledText]}>
-              {city || 'Select City'}
+              {city || t('selectCity')}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#666666" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Address</Text>
-          <TextInput value={address} onChangeText={setAddress} placeholder="Enter your address" style={[styles.input, { height: 90, textAlignVertical: 'top' }]} multiline />
+          <Text style={styles.label}>{t('address')}</Text>
+          <TextInput value={address} onChangeText={setAddress} placeholder={t('address')} style={[styles.input, { height: 90, textAlignVertical: 'top' }]} multiline />
         </View>
 
         <TouchableOpacity style={[styles.saveButton, saving && { opacity: 0.6 }]} disabled={saving} onPress={handleSave}>
-          <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save'}</Text>
+          <Text style={styles.saveText}>{saving ? t('loading') : t('save')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -575,7 +577,7 @@ const styles = StyleSheet.create({
     color: '#D1D5DB',
   },
   saveButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#0e7c36',
     height: 50,
     borderRadius: 12,
     alignItems: 'center',
@@ -625,7 +627,7 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   modalItemTextSelected: {
-    color: '#2E7D32',
+    color: '#0e7c36',
     fontWeight: '600',
   },
 });

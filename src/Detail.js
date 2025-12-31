@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: '#2E7D32',
+        color: '#0e7c36',
         textAlign: 'center',
         marginBottom: 12,
     },
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8F9FA',
     },
     genderButtonActive: {
-        borderColor: '#2E7D32',
+        borderColor: '#0e7c36',
         backgroundColor: '#E8F5E8',
     },
     genderButtonText: {
@@ -310,17 +310,17 @@ const styles = StyleSheet.create({
         color: '#666666',
     },
     genderButtonTextActive: {
-        color: '#2E7D32',
+        color: '#0e7c36',
         fontWeight: '600',
     },
     button: {
-        backgroundColor: '#2E7D32',
+        backgroundColor: '#0e7c36',
         height: 56,
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 20,
-        shadowColor: '#2E7D32',
+        shadowColor: '#0e7c36',
         shadowOffset: {
             width: 0,
             height: 4,
