@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { 
-    View, 
-    Text, 
-    TextInput, 
-    TouchableOpacity, 
-    SafeAreaView, 
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    SafeAreaView,
     StatusBar,
     StyleSheet,
     Alert,
@@ -19,7 +19,7 @@ import { useNavigation } from "@react-navigation/native";
 export default function Detail({ route }) {
     const navigation = useNavigation();
     const { uid } = route.params || {};
-    
+
     const [name, setName] = useState("");
     const [dob, setDob] = useState("");
     const [gender, setGender] = useState("");
@@ -31,17 +31,17 @@ export default function Detail({ route }) {
             Alert.alert("Missing Information", "Please enter your full name");
             return false;
         }
-        
-        if (!dob.trim()) {
-            Alert.alert("Missing Information", "Please enter your date of birth");
-            return false;
-        }
-        
+
+        // if (!dob.trim()) {
+        //     Alert.alert("Missing Information", "Please enter your date of birth");
+        //     return false;
+        // }
+
         if (!gender.trim()) {
             Alert.alert("Missing Information", "Please select your gender");
             return false;
         }
-        
+
         return true;
     };
 
@@ -60,14 +60,14 @@ export default function Detail({ route }) {
         setLoading(true);
         try {
             console.log('Saving user details for UID:', uid);
-            
+
             // Save to Firestore
             await firestore()
                 .collection("users")
                 .doc(uid)
                 .set({
                     name: name.trim(),
-                    dob: dob.trim(),
+                    // dob: dob.trim(),
                     gender: gender.trim(),
                     createdAt: firestore.FieldValue.serverTimestamp(),
                     updatedAt: firestore.FieldValue.serverTimestamp(),
@@ -87,8 +87,17 @@ export default function Detail({ route }) {
                             // Use reset to prevent going back to this screen
                             navigation.reset({
                                 index: 0,
-                                routes: [{ name: 'Home' }],
+                                routes: [
+                                    {
+                                        name: 'Dashboard',
+                                        state: {
+                                            index: 0,
+                                            routes: [{ name: 'Home' }],
+                                        },
+                                    },
+                                ],
                             });
+
                         }
                     }
                 ]
@@ -98,15 +107,15 @@ export default function Detail({ route }) {
             console.error("Error saving details:", error);
             console.error("Error code:", error?.code);
             console.error("Error message:", error?.message);
-            
+
             let errorMessage = "Failed to save your profile. Please try again.";
-            
+
             if (error?.code === 'firestore/permission-denied') {
                 errorMessage = "Permission denied. Please check Firestore security rules.";
             } else if (error?.message) {
                 errorMessage = error.message;
             }
-            
+
             Alert.alert("Error", errorMessage);
         } finally {
             setLoading(false);
@@ -116,12 +125,12 @@ export default function Detail({ route }) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
-            
-            <KeyboardAvoidingView 
+
+            <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
-                <ScrollView 
+                <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
@@ -148,7 +157,7 @@ export default function Detail({ route }) {
                             />
                         </View>
 
-                        <View style={styles.inputContainer}>
+                        {/* <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Date of Birth *</Text>
                             <TextInput
                                 style={styles.textInput}
@@ -161,7 +170,7 @@ export default function Detail({ route }) {
                                 editable={!loading}
                             />
                             <Text style={styles.helperText}>Example: 15/08/1990</Text>
-                        </View>
+                        </View> */}
 
                         <View style={styles.inputContainer}>
                             <Text style={styles.inputLabel}>Gender *</Text>
@@ -179,7 +188,7 @@ export default function Detail({ route }) {
                                         gender === 'Male' && styles.genderButtonTextActive
                                     ]}>Male</Text>
                                 </TouchableOpacity>
-                                
+
                                 <TouchableOpacity
                                     style={[
                                         styles.genderButton,
@@ -193,7 +202,7 @@ export default function Detail({ route }) {
                                         gender === 'Female' && styles.genderButtonTextActive
                                     ]}>Female</Text>
                                 </TouchableOpacity>
-                                
+
                                 <TouchableOpacity
                                     style={[
                                         styles.genderButton,
