@@ -30,6 +30,7 @@ import Voice from '@react-native-voice/voice';
 import { vh, ms } from './utils/responsive';
 import { useNotifications } from './NotificationsContext';
 import { getProductForNavigation, getProductImageSource, resolvePackOptions, UNIT_TYPES } from './utils/products';
+import { getCachedAIRecommendations } from './services/productRecommendation';
 
 const { width } = Dimensions.get('window');
 // Width for horizontal product cards: exactly 2 cards per viewport with spacing
@@ -189,6 +190,10 @@ export default function HomeScreen() {
 
   // Load user orders for recommendations
   const [userOrders, setUserOrders] = useState([]);
+  // AI-powered recommended products
+  const [aiRecommendedProducts, setAiRecommendedProducts] = useState([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  
   useEffect(() => {
     const u = auth().currentUser;
     if (!u) {
@@ -761,6 +766,52 @@ export default function HomeScreen() {
   const safeRecommended = Array.isArray(recommendedProducts) ? recommendedProducts : [];
   const allProducts = [...safeBestSelling, ...safeRecommended];
 
+  // Fetch AI-powered product recommendations
+  useEffect(() => {
+    const fetchAIRecommendations = async () => {
+      // Only fetch if we have products available
+      if (!allProducts || allProducts.length === 0) {
+        return;
+      }
+
+      setIsLoadingRecommendations(true);
+      try {
+        // Get the most recent search query if available
+        const latestSearch = Array.isArray(recentSearches) && recentSearches.length > 0
+          ? recentSearches[0]
+          : '';
+
+        const recommendations = await getCachedAIRecommendations({
+          allProducts: allProducts,
+          userQuery: latestSearch,
+          userOrders: userOrders,
+          recentSearches: recentSearches,
+          numRecommendations: 6, // Get 6 recommendations to have options
+        });
+
+        if (Array.isArray(recommendations) && recommendations.length > 0) {
+          setAiRecommendedProducts(recommendations);
+        } else {
+          // Fallback to static recommendations if AI fails
+          setAiRecommendedProducts([]);
+        }
+      } catch (error) {
+        console.error('Error fetching AI recommendations:', error);
+        // Fallback to static recommendations on error
+        setAiRecommendedProducts([]);
+      } finally {
+        setIsLoadingRecommendations(false);
+      }
+    };
+
+    // Debounce to avoid too many API calls
+    const timer = setTimeout(() => {
+      fetchAIRecommendations();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [allProducts, userOrders, recentSearches]);
+
   // Get recommended products based on user orders
   const getRecommendedFromOrders = useCallback(() => {
     try {
@@ -813,7 +864,11 @@ export default function HomeScreen() {
     return result;
   };
 
-  const filteredRecommended = filterProducts(recommendedProducts);
+  // Use AI recommendations if available, otherwise fallback to static recommendations
+  const productsToRecommend = aiRecommendedProducts.length > 0 
+    ? aiRecommendedProducts 
+    : recommendedProducts;
+  const filteredRecommended = filterProducts(productsToRecommend);
   const filteredBestSelling = filterProducts(bestSellingProducts);
   const filteredProducts = filterProducts(allProducts);
   const todaysOfferProducts = filteredRecommended.slice(0, 2);
@@ -1475,7 +1530,7 @@ export default function HomeScreen() {
         >
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t('recommended')}</Text>
-            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'recommended', baseProducts: recommendedProducts })}>
+            <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('ProductsViewAll', { section: 'recommended', baseProducts: productsToRecommend })}>
               <Text style={styles.viewAllBtnText}>{t('viewAll')}</Text>
             </TouchableOpacity>
           </View>

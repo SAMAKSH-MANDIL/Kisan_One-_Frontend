@@ -30,28 +30,10 @@ export async function generateGeminiReply(messages) {
     throw new Error('Messages array is required and must not be empty.');
   }
 
-  // Add system instruction for better agricultural responses
+  // System instruction matching LangChain configuration for Kisan One
   const systemInstruction = {
     parts: [{ 
-      text: `You are an expert agricultural assistant helping farmers with crop-related questions. 
-Provide detailed, accurate, and helpful responses about:
-- Crop definitions and types (rabi, kharif, zaid crops)
-- Agricultural practices and techniques
-- Pest and disease management
-- Weather and climate information
-- Soil management
-- Market prices and trends
-- Fertilizers and inputs
-- Irrigation methods
-- Crop calendars and planting schedules
-
-Always give comprehensive answers with clear explanations. For example, if asked "what is rabi crops", provide a complete definition including:
-- What rabi crops are
-- When they are grown (season)
-- Examples of rabi crops
-- Characteristics and importance
-
-Be conversational, friendly, and use simple language that farmers can understand.`
+      text: `You are a helpful AI assistant that works for Kisan One app. Kisan One is an AI-powered, voice-first advisory and marketplace platform, connecting farmers and agri innovators both online and offline. Solve agricultural queries related to farming, crops, soil, fertilizers, and weather. Always respond politely and clearly in simple language. Try not to give the response in long paragraph instead give bullet points or numbered list wherever possible.`
     }]
   };
 
@@ -60,18 +42,22 @@ Be conversational, friendly, and use simple language that farmers can understand
     parts: [{ text: String(m.text || '') }],
   }));
 
-  // Try models in order: gemini-2.5-pro (requested), then fallbacks
+  // Try models in order: gemini-1.5-flash first (higher rate limits on free tier)
   const modelsToTry = [
-    'gemini-2.5-pro',        // Requested model - advanced reasoning model
-    'gemini-2.0-flash-exp',  // Latest experimental model
-    'gemini-1.5-pro',        // Stable pro model
-    'gemini-1.5-flash'       // Fast fallback
+    'gemini-1.5-flash',      // Fast model with higher free tier quotas - USE THIS FIRST
+    'gemini-1.5-pro',        // Pro model (lower quotas)
+    'gemini-2.0-flash-exp'   // Latest experimental model (if available)
   ];
 
-  // Prepare request body with system instruction
+  // Prepare request body with system instruction and generation config
+  // Using lower max tokens to reduce quota usage and avoid rate limits
   const requestBody = {
     contents: contents,
     systemInstruction: systemInstruction,
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 1024,  // Reduced from 2048 to use less quota
+    },
   };
 
   let lastError = null;
@@ -93,13 +79,25 @@ Be conversational, friendly, and use simple language that farmers can understand
         if (!res.ok) {
           const errText = await res.text().catch(() => '');
           
+          // Handle rate limit errors (429) - stop trying other models immediately
+          if (res.status === 429) {
+            let errorMsg = 'Rate limit exceeded';
+            try {
+              const errorData = errText ? JSON.parse(errText) : null;
+              if (errorData && errorData.error && errorData.error.message) {
+                errorMsg = errorData.error.message;
+              }
+            } catch (_) {}
+            throw new Error(`429 - ${errorMsg}`);
+          }
+          
           // If model not found (404), try next model
           if (res.status === 404) {
             lastError = new Error(`Model ${modelName} not found`);
             continue; // Try next model
           }
           
-          // For other errors, throw immediately
+          // For other errors, throw immediately (don't try more models)
           let errorMsg = `Gemini request failed: ${res.status}`;
           try {
             const errorData = errText ? JSON.parse(errText) : null;

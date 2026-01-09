@@ -100,13 +100,13 @@ export default function AIToolsScreen() {
         setGeminiApiKey(envKey);
       } else {
         // Fallback to hardcoded key if no env key is available
-        setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
+        setGeminiApiKey('AIzaSyDx6RZmYTgtsRfA6MeInoSoOuH5__NS0CY');
       }
     } catch (error) {
       console.log('Error setting Gemini API key:', error);
       // Still try to set fallback key even if there's an error
       try {
-        setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
+        setGeminiApiKey('AIzaSyDx6RZmYTgtsRfA6MeInoSoOuH5__NS0CY');
       } catch (_) {}
     }
   }, []);
@@ -455,10 +455,16 @@ export default function AIToolsScreen() {
         ? process.env.EXPO_PUBLIC_GEMINI_API_KEY 
         : null;
       if (!envKey || !envKey.trim()) {
-        setGeminiApiKey('AIzaSyCgYM3Key2yLV0ck0HrBCwLAQqMffNHbKU');
+        setGeminiApiKey('AIzaSyA5Sq8hmdeMrbpq9JP7VKDnjPXAXE9_3ek');
       }
       
-      const reply = await generateGeminiReply(nextMessages);
+      // Limit history to last 14 messages (matching LangChain RunnableWithMessageHistory behavior)
+      let messagesToSend = nextMessages;
+      if (messagesToSend.length > 14) {
+        messagesToSend = messagesToSend.slice(-14);
+      }
+      
+      const reply = await generateGeminiReply(messagesToSend);
       setChatMessages((prev) => [...prev, { role: 'model', text: reply }]);
     } catch (e) {
       console.log('Gemini error:', e);
