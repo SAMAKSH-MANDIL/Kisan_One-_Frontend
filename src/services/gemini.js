@@ -6,10 +6,14 @@ let API_KEY = (typeof process !== 'undefined' && process.env && process.env.EXPO
   : '';
 
 export const setGeminiApiKey = (key) => {
-  if (key && typeof key === 'string') {
+  if (key && typeof key === 'string' && key.trim().length > 0) {
     API_KEY = key.trim();
   } else {
-    API_KEY = '';
+    // Don't clear the API key if an invalid value is passed
+    // Only clear if explicitly passed as empty string
+    if (key === '' || key === null || key === undefined) {
+      API_KEY = '';
+    }
   }
 };
 
@@ -19,9 +23,24 @@ export const hasApiKey = () => {
 };
 
 // messages: Array<{ role: 'user' | 'model', text: string }>
-export async function generateGeminiReply(messages) {
+// apiKey: optional API key to use (if not provided, uses module-level API_KEY)
+export async function generateGeminiReply(messages, apiKey = null) {
+  // Use provided API key first, then module-level API_KEY, then env variable
+  let keyToUse = null;
+  
+  if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
+    keyToUse = apiKey.trim();
+  } else if (API_KEY && API_KEY.length > 0) {
+    keyToUse = API_KEY.trim();
+  } else {
+    const envKey = (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_GEMINI_API_KEY);
+    if (envKey && typeof envKey === 'string' && envKey.trim().length > 0) {
+      keyToUse = envKey.trim();
+    }
+  }
+  
   // Check if API key is set
-  if (!API_KEY || API_KEY.length === 0) {
+  if (!keyToUse || keyToUse.length === 0) {
     throw new Error('Gemini API key is missing. Set EXPO_PUBLIC_GEMINI_API_KEY or call setGeminiApiKey().');
   }
 
@@ -42,21 +61,22 @@ export async function generateGeminiReply(messages) {
     parts: [{ text: String(m.text || '') }],
   }));
 
-  // Try models in order: gemini-1.5-flash first (higher rate limits on free tier)
+  // Use latest Gemini models as per official documentation (https://ai.google.dev/gemini-api/docs#javascript)
+  // gemini-2.5-flash is recommended for balanced performance with good rate limits
   const modelsToTry = [
-    'gemini-1.5-flash',      // Fast model with higher free tier quotas - USE THIS FIRST
-    'gemini-1.5-pro',        // Pro model (lower quotas)
-    'gemini-2.0-flash-exp'   // Latest experimental model (if available)
+    'gemini-2.5-flash',      // Latest balanced model with good rate limits (recommended)
+    'gemini-2.5-flash-lite', // Fastest and most cost-efficient
+    'gemini-1.5-flash'       // Fallback to older model if newer ones fail
   ];
 
   // Prepare request body with system instruction and generation config
-  // Using lower max tokens to reduce quota usage and avoid rate limits
+  // Using appropriate max tokens to balance quality and quota usage
   const requestBody = {
     contents: contents,
     systemInstruction: systemInstruction,
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 1024,  // Reduced from 2048 to use less quota
+      maxOutputTokens: 2048,
     },
   };
 
@@ -68,16 +88,30 @@ export async function generateGeminiReply(messages) {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
         
-        const res = await fetch(`${endpoint}?key=${API_KEY}`, {
+        // Use header-based authentication as per official documentation
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-goog-api-key': keyToUse,
           },
           body: JSON.stringify(requestBody),
         });
 
         if (!res.ok) {
           const errText = await res.text().catch(() => '');
+          
+          // Handle authentication errors (401/403) - API key invalid or missing
+          if (res.status === 401 || res.status === 403) {
+            let errorMsg = 'API key authentication failed';
+            try {
+              const errorData = errText ? JSON.parse(errText) : null;
+              if (errorData && errorData.error && errorData.error.message) {
+                errorMsg = errorData.error.message;
+              }
+            } catch (_) {}
+            throw new Error(`401 - ${errorMsg}`);
+          }
           
           // Handle rate limit errors (429) - stop trying other models immediately
           if (res.status === 429) {

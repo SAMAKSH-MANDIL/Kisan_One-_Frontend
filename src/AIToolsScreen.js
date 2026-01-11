@@ -96,17 +96,19 @@ export default function AIToolsScreen() {
         : null;
       
       // Always set the API key explicitly (either from env or fallback)
+      const FALLBACK_API_KEY = 'AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I';
       if (envKey && envKey.trim()) {
         setGeminiApiKey(envKey);
       } else {
         // Fallback to hardcoded key if no env key is available
-        setGeminiApiKey('AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I');
+        setGeminiApiKey(FALLBACK_API_KEY);
       }
     } catch (error) {
       console.log('Error setting Gemini API key:', error);
       // Still try to set fallback key even if there's an error
       try {
-        setGeminiApiKey('AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I');
+        const FALLBACK_API_KEY = 'AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I';
+        setGeminiApiKey(FALLBACK_API_KEY);
       } catch (_) {}
     }
   }, []);
@@ -450,12 +452,24 @@ export default function AIToolsScreen() {
     setChatInput('');
     setChatLoading(true);
     try {
-      // Ensure API key is set before making request
+      // Ensure API key is set before making request (set it every time to be safe)
       const envKey = (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_GEMINI_API_KEY) 
-        ? process.env.EXPO_PUBLIC_GEMINI_API_KEY 
+        ? process.env.EXPO_PUBLIC_GEMINI_API_KEY.trim() 
         : null;
-      if (!envKey || !envKey.trim()) {
-        setGeminiApiKey('AIzaSyA5Sq8hmdeMrbpq9JP7VKDnjPXAXE9_3ek');
+      
+      // Always set the API key - prefer env variable, fallback to hardcoded key
+      // Use the same fallback key as in useEffect for consistency
+      const FALLBACK_API_KEY = 'AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I';
+      const apiKeyToUse = (envKey && envKey.trim().length > 0) 
+        ? envKey.trim() 
+        : FALLBACK_API_KEY;
+      
+      // Set API key in module (for other parts of app that might use it)
+      setGeminiApiKey(apiKeyToUse);
+      
+      // Verify API key is set before making request
+      if (!apiKeyToUse || apiKeyToUse.trim().length === 0) {
+        throw new Error('Gemini API key is missing. Please set EXPO_PUBLIC_GEMINI_API_KEY environment variable.');
       }
       
       // Limit history to last 14 messages (matching LangChain RunnableWithMessageHistory behavior)
@@ -464,7 +478,8 @@ export default function AIToolsScreen() {
         messagesToSend = messagesToSend.slice(-14);
       }
       
-      const reply = await generateGeminiReply(messagesToSend);
+      // Pass API key directly to function to ensure it's used
+      const reply = await generateGeminiReply(messagesToSend, apiKeyToUse);
       setChatMessages((prev) => [...prev, { role: 'model', text: reply }]);
     } catch (e) {
       console.log('Gemini error:', e);

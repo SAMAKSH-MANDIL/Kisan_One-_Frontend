@@ -89,6 +89,8 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState('Home');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [zoomedImage, setZoomedImage] = useState(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isBannerScrolling, setIsBannerScrolling] = useState(false);
   
   // Refs for scrolling to sections
   const scrollViewRef = useRef(null);
@@ -96,6 +98,8 @@ export default function HomeScreen() {
   const todaysOfferSectionRef = useRef(null);
   const bestSellingSectionRef = useRef(null);
   const productsSectionRef = useRef(null);
+  const bannerFlatListRef = useRef(null);
+  const bannerScrollTimer = useRef(null);
   
   // Store section positions
   const [sectionPositions, setSectionPositions] = useState({
@@ -436,6 +440,38 @@ export default function HomeScreen() {
     parent.reset({ index: 0, routes: [{ name: 'Login' }] });
   };
 
+
+  // Handle banner scroll event
+  const onBannerScroll = (event) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const currentIndex = Math.round(contentOffsetX / width);
+    setCurrentBannerIndex(currentIndex);
+  };
+
+  // Handle scroll begin (user starts scrolling)
+  const onBannerScrollBeginDrag = () => {
+    setIsBannerScrolling(true);
+  };
+
+  // Handle scroll end (user stops scrolling)
+  const onBannerScrollEndDrag = () => {
+    setTimeout(() => setIsBannerScrolling(false), 1000); // Resume auto-scroll after 1 second
+  };
+
+  // Handle viewable items changed
+  const onViewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      const currentIndex = viewableItems[0].index;
+      if (currentIndex !== null && currentIndex !== undefined) {
+        setCurrentBannerIndex(currentIndex);
+      }
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
   const categories = [
     { id: 0, name: 'All', imageSource: require('../assets/data/all_icon.png') },
     { id: 1, name: 'Seeds', imageSource: require('../assets/data/seeds.png') },
@@ -444,6 +480,89 @@ export default function HomeScreen() {
     { id: 4, name: 'Garden Care', imageSource: require('../assets/data/Garden Care.png') },
     { id: 5, name: 'Agri Equipment', imageSource: require('../assets/data/Agri Equipment.png') },
   ];
+
+  // Banner images array - Replace these with your actual banner image paths or URLs
+  const bannerImages = [
+    {
+      id: 1,
+      title: 'Krishi Mitras: Trusted Local Advisors',
+      subtitle: 'Find nearby Krishi Mitras for expert agri advice & support',
+      // Use require() for local images or { uri: 'URL' } for remote images
+      image: require('../assets/data/B1.png'), // Replace with actual banner image
+      // image: { uri: 'https://example.com/banner1.jpg' }, // Alternative: use URL
+    },
+    {
+      id: 2,
+      title: 'Track & Manage Your Orders',
+      subtitle: 'Check your order history & get live delivery updates',
+      image: require('../assets/data/B2.png'), // Replace with actual banner image
+    },
+    {
+      id: 3,
+      title: 'AI Tools & Personalized Advice',
+      subtitle: 'Get AI crop recommendations, weather insights & disease alerts',
+      image: require('../assets/data/B3.png'), // Replace with actual banner image
+    },
+    {
+      id: 4,
+      title: 'Always Stay Informed',
+      subtitle: 'Track mandi prices, weather forecast & more from your phone',
+      image: require('../assets/data/B4.png'), // Replace with actual banner image
+    },
+    {
+      id: 5,
+      title: 'Image-Based Disease Detection',
+      subtitle: 'Scan affected crops to identify diseases & get treatment advice',
+      image: require('../assets/data/B5.png'), // Replace with actual banner image
+    },
+    {
+      id: 6,
+      title: 'Your Online Agri Shop',
+      subtitle: 'Order seeds, fertilizers, pesticides & more, all in one place',
+      image: require('../assets/data/B6.png'), // Replace with actual banner image
+    },
+  ];
+
+  // Auto-scroll banner carousel
+  useEffect(() => {
+    if (bannerImages.length === 0) return;
+    
+    const scrollInterval = setInterval(() => {
+      // Don't auto-scroll if user is manually scrolling
+      if (isBannerScrolling) return;
+      
+      setCurrentBannerIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % bannerImages.length;
+        if (bannerFlatListRef.current) {
+          try {
+            bannerFlatListRef.current.scrollToIndex({
+              index: nextIndex,
+              animated: true,
+            });
+          } catch (error) {
+            // Fallback to scrollToOffset if scrollToIndex fails
+            try {
+              bannerFlatListRef.current.scrollToOffset({
+                offset: width * nextIndex,
+                animated: true,
+              });
+            } catch (offsetError) {
+              console.log('Banner scroll error:', offsetError);
+            }
+          }
+        }
+        return nextIndex;
+      });
+    }, 3000); // Auto-scroll every 3 seconds
+
+    bannerScrollTimer.current = scrollInterval;
+
+    return () => {
+      if (bannerScrollTimer.current) {
+        clearInterval(bannerScrollTimer.current);
+      }
+    };
+  }, [isBannerScrolling, bannerImages.length]);
 
   const recommendedProducts = [
     // Seeds
@@ -1491,10 +1610,50 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* Banner */}
+        {/* Banner Carousel */}
         <View style={styles.imageBannerContainer}>
-          <View style={styles.imageBanner}>
-            <Text style={styles.bannerImageEmoji}>🌾🏭</Text>
+          <FlatList
+            ref={bannerFlatListRef}
+            data={bannerImages}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.bannerSlide}>
+                <Image 
+                  source={item.image} 
+                  style={styles.bannerImage}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+            onScroll={onBannerScroll}
+            scrollEventThrottle={16}
+            onScrollBeginDrag={onBannerScrollBeginDrag}
+            onScrollEndDrag={onBannerScrollEndDrag}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            getItemLayout={(data, index) => ({
+              length: width, // full width for paging
+              offset: width * index,
+              index,
+            })}
+            snapToInterval={width}
+            decelerationRate="fast"
+            snapToAlignment="start"
+          />
+          {/* Banner Indicators */}
+          <View style={styles.bannerIndicators}>
+            {bannerImages.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.bannerIndicator,
+                  currentBannerIndex === index && styles.bannerIndicatorActive,
+                ]}
+              />
+            ))}
           </View>
         </View>
 
@@ -2861,18 +3020,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   imageBannerContainer: {
-    paddingHorizontal: 16,
     marginBottom: 24,
+    position: 'relative',
+    width: '100%',
   },
-  imageBanner: {
+  bannerSlide: {
+    width: width,
     height: vh(22),
-    backgroundColor: '#E8F5E8',
-    borderRadius: 16,
+    paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bannerImageEmoji: {
-    fontSize: 60,
+  bannerImage: {
+    width: width - 32,
+    height: '100%',
+    borderRadius: 16,
+  },
+  bannerIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  bannerIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D1D5DB',
+    marginHorizontal: 4,
+  },
+  bannerIndicatorActive: {
+    width: 24,
+    backgroundColor: '#0e7c36',
   },
   brandsSectionContainer: {
     paddingHorizontal: 16,
