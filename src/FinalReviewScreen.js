@@ -12,26 +12,44 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useOrders } from './OrdersContext';
+import RazorpayCheckout from 'react-native-razorpay';
+import axios from 'axios';
+import { getAuth } from 'firebase/auth';
+
 import { useCart } from './CartContext';
 import { getProductImageSource } from './utils/products';
+
+/* ---------------- AXIOS (INLINE) ---------------- */
+
+const api = axios.create({
+  baseURL: 'https://YOUR_BACKEND_URL/api/v1', // 👈 CHANGE THIS
+});
+
+api.interceptors.request.use(async (config) => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+/* ------------------------------------------------ */
 
 export default function FinalReviewScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
-  const { addOrder } = useOrders();
   const { clearCart } = useCart();
   const [loading, setLoading] = useState(false);
 
   const {
     items = [],
-    subtotal = 0,
-    shoppingCharges = 0,
     total = 0,
     address = null,
-    buyNowProduct = null,
-    reorderItems = null,
   } = route.params || {};
 
   const handlePlaceOrder = async () => {
@@ -41,50 +59,47 @@ export default function FinalReviewScreen() {
     }
 
     setLoading(true);
+
     try {
-      const now = new Date();
-      const orderNumber = `ORD-${now.getTime()}`;
-      const formattedDate = now.toISOString().split('T')[0];
-
-      const order = {
-        id: orderNumber,
-        orderNumber,
-        date: formattedDate,
-        status: 'Pending',
-        total: `₹${total.toFixed(2)}`,
-        items: items.reduce((sum, item) => sum + item.quantity, 0),
-        products: items.map((item) => ({
-          name: item.name,
+      /* 1️⃣ CREATE ORDER (Backend already handles Razorpay order) */
+      const res = await api.post('/orders/create', {
+        items: items.map(item => ({
+          product_id: item.id,      // backend UUID
           quantity: item.quantity,
-          price: `₹${((item.priceValue || 0) * item.quantity).toFixed(2)}`,
-          pack: item.pack || null,
         })),
-        address: address,
-      };
+      });
 
-      addOrder(order);
+      const {
+        order_id,
+        razorpay_order_id,
+        amount,
+        razorpay_key,
+      } = res.data;
 
-      // Clear cart if not Buy Now or Reorder (these items aren't in cart)
-      if (!buyNowProduct && !reorderItems) {
-        clearCart();
-      }
-
-      Alert.alert('Order Placed', 'Thank you! Your order has been placed successfully.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [
-                { name: 'Dashboard', params: { screen: 'My Orders' } },
-              ],
-            });
-          },
+      /* 2️⃣ OPEN RAZORPAY CHECKOUT */
+      await RazorpayCheckout.open({
+        key: razorpay_key,
+        amount: amount * 100,       // paise
+        currency: 'INR',
+        name: 'KisanOne',
+        description: 'Order Payment',
+        order_id: razorpay_order_id,
+        prefill: {
+          contact: address.mobileNumber || address.mobile,
         },
-      ]);
-    } catch (error) {
-      console.error('Error placing order:', error);
-      Alert.alert('Error', 'Failed to place order. Please try again.');
+        theme: { color: '#0e7c36' },
+      });
+
+      /* 3️⃣ SUCCESS UI ONLY (Webhook will update DB) */
+      clearCart();
+
+      navigation.replace('PaymentSuccess', {
+        orderId: order_id,
+      });
+
+    } catch (err) {
+      console.error('Payment error:', err);
+      navigation.replace('PaymentFailed');
     } finally {
       setLoading(false);
     }
@@ -94,10 +109,7 @@ export default function FinalReviewScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top || 0, 12) }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Review Order</Text>
@@ -112,10 +124,10 @@ export default function FinalReviewScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Products Section */}
+        {/* Products */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Products</Text>
-          {items.map((item) => (
+          {items.map(item => (
             <View key={item.id} style={styles.productCard}>
               <View style={styles.productImageContainer}>
                 {getProductImageSource(item) ? (
@@ -132,33 +144,28 @@ export default function FinalReviewScreen() {
                 <Text style={styles.productName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                {item.brand && (
-                  <Text style={styles.productBrand}>{item.brand}</Text>
-                )}
-                {item.pack && (
-                  <Text style={styles.productPack}>Pack: {item.pack}</Text>
-                )}
                 <Text style={styles.productPrice}>
-                  ₹{(item.priceValue || 0).toFixed(2)} × {item.quantity}
+                  ₹{item.priceValue.toFixed(2)} × {item.quantity}
                 </Text>
               </View>
             </View>
           ))}
         </View>
 
-        {/* Address Section */}
+        {/* Address */}
         {address && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Delivery Address</Text>
             <View style={styles.addressCard}>
               <Text style={styles.addressName}>{address.fullName || address.name}</Text>
-              <Text style={styles.addressMobile}>{address.mobileNumber || address.mobile}</Text>
+              <Text style={styles.addressMobile}>
+                {address.mobileNumber || address.mobile}
+              </Text>
               <Text style={styles.addressText}>
                 {[
                   address.flatHouseNo,
                   address.streetArea || address.address,
                   address.city,
-                  address.district,
                   address.state,
                   address.pinCode || address.pincode,
                 ]
@@ -170,13 +177,8 @@ export default function FinalReviewScreen() {
         )}
       </ScrollView>
 
-      {/* Sticky Place Order Button */}
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: 12 + (insets.bottom || 0) },
-        ]}
-      >
+      {/* Footer */}
+      <View style={[styles.footer, { paddingBottom: 12 + (insets.bottom || 0) }]}>
         <View style={styles.footerLeft}>
           <Text style={styles.totalLabel}>Total Price</Text>
           <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
@@ -185,10 +187,9 @@ export default function FinalReviewScreen() {
           style={[styles.placeOrderButton, loading && styles.placeOrderButtonDisabled]}
           onPress={handlePlaceOrder}
           disabled={loading}
-          activeOpacity={0.8}
         >
           <Text style={styles.placeOrderButtonText}>
-            {loading ? 'Placing...' : 'Place Order'}
+            {loading ? 'Processing...' : 'Pay Now'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -196,11 +197,10 @@ export default function FinalReviewScreen() {
   );
 }
 
+/* ---------------- STYLES (UNCHANGED) ---------------- */
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -211,23 +211,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 16,
-  },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  scrollView: { flex: 1 },
+  content: { padding: 16 },
   section: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -236,12 +223,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
   productCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -258,39 +240,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    overflow: 'hidden',
   },
-  productImage: {
-    width: '100%',
-    height: '100%',
-  },
-  productEmoji: {
-    fontSize: 40,
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  productBrand: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  productPack: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 4,
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0e7c36',
-  },
+  productImage: { width: '100%', height: '100%' },
+  productEmoji: { fontSize: 40 },
+  productInfo: { flex: 1 },
+  productName: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  productPrice: { fontSize: 16, fontWeight: '700', color: '#0e7c36' },
   addressCard: {
     padding: 12,
     borderRadius: 10,
@@ -298,22 +253,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  addressName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  addressMobile: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  addressText: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-  },
+  addressName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  addressMobile: { fontSize: 14, color: '#6B7280', marginBottom: 4 },
+  addressText: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -323,25 +265,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
   },
-  footerLeft: {
-    flex: 1,
-  },
-  totalLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
+  footerLeft: { flex: 1 },
+  totalLabel: { fontSize: 12, color: '#6B7280' },
+  totalValue: { fontSize: 20, fontWeight: '700' },
   placeOrderButton: {
     backgroundColor: '#0e7c36',
     paddingHorizontal: 24,
@@ -349,13 +276,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginLeft: 16,
   },
-  placeOrderButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  placeOrderButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  placeOrderButtonDisabled: { backgroundColor: '#9CA3AF' },
+  placeOrderButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
-

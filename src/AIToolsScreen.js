@@ -100,13 +100,13 @@ export default function AIToolsScreen() {
         setGeminiApiKey(envKey);
       } else {
         // Fallback to hardcoded key if no env key is available
-        setGeminiApiKey('AIzaSyDx6RZmYTgtsRfA6MeInoSoOuH5__NS0CY');
+        setGeminiApiKey('AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I');
       }
     } catch (error) {
       console.log('Error setting Gemini API key:', error);
       // Still try to set fallback key even if there's an error
       try {
-        setGeminiApiKey('AIzaSyDx6RZmYTgtsRfA6MeInoSoOuH5__NS0CY');
+        setGeminiApiKey('AIzaSyB35_3MXNaR10d1hSq9p7GjywLO09rd23I');
       } catch (_) {}
     }
   }, []);

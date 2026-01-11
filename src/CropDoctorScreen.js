@@ -128,7 +128,7 @@ export default function CropDoctorScreen({ navigation }) {
         type: mimeType,
       });
           // link has to be change when we deploy the backend
-      const response = await fetch('https://650fa7f6fe45.ngrok-free.app/api/v1/crop-doctor/analyze', {
+      const response = await fetch('https://kisanone-backend-render-deployment.onrender.com/api/v1/crop-doctor/analyze', {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -361,21 +361,7 @@ export default function CropDoctorScreen({ navigation }) {
         </View>
 
         {/* Supported Crops Section */}
-        <View style={styles.cropsSection}>
-          <Text style={styles.sectionTitle}>Supported Crops</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsWrap}
-          >
-            {['Wheat', 'Rice', 'Maize', 'Cotton', 'Sugarcane', 'Tomato', 'Potato', 'Chili']
-              .map((c) => (
-                <View key={c} style={styles.chip}>
-                  <Text style={styles.chipText}>{c}</Text>
-                </View>
-            ))}
-          </ScrollView>
-        </View>
+        
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   View,
@@ -8,13 +8,18 @@ import {
   StatusBar,
   ScrollView,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from './LanguageContext';
+import * as Location from 'expo-location';
+import axios from 'axios';
 
 export default function CropRecommendationScreen({ navigation }) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Fetching location...');
   const [topCrops, setTopCrops] = useState([]);
   const [fieldInfo, setFieldInfo] = useState({
     nitrogen: 0,
@@ -25,73 +30,179 @@ export default function CropRecommendationScreen({ navigation }) {
     ph: 0,
     rain: 0,
   });
+  const [error, setError] = useState(null);
+
+  // Animation values
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Simulate API call to get crop recommendations based on location
     loadRecommendations();
   }, []);
 
+  // Loading animation
+  useEffect(() => {
+    if (loading) {
+      // Pulse animation
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      // Fade animation for text
+      const fade = Animated.loop(
+        Animated.sequence([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 0.5,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      // Rotate animation
+      const rotate = Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      );
+
+      pulse.start();
+      fade.start();
+      rotate.start();
+
+      return () => {
+        pulse.stop();
+        fade.stop();
+        rotate.stop();
+      };
+    }
+  }, [loading]);
+
   const loadRecommendations = async () => {
-    // Simulate loading
-    setLoading(true);
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Step 1: Get location
+      setLoadingMessage('Fetching location...');
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Location permission is required to get crop recommendations');
+        setLoading(false);
+        return;
+      }
 
-    // Mock data - in real app, this would come from an API based on location
-    const mockCrops = [
-      {
-        id: 1,
-        name: 'Wheat',
-        icon: '🌾',
-        reasons: [
-          'Optimal soil pH (6.0-7.5) for wheat cultivation',
-          'Moderate rainfall (500-750mm) suits wheat growth',
-          'Temperature range (20-25°C) is ideal during growing season',
-          'Good nitrogen levels support grain development'
-        ],
-        suitability: 92,
-      },
-      {
-        id: 2,
-        name: 'Rice',
-        icon: '🌾',
-        reasons: [
-          'High humidity (70-80%) perfect for rice cultivation',
-          'Adequate rainfall supports paddy field requirements',
-          'Warm temperature (25-35°C) ideal for rice growth',
-          'Soil pH (5.5-6.5) matches rice preferences'
-        ],
-        suitability: 88,
-      },
-      {
-        id: 3,
-        name: 'Soybean',
-        icon: '🫘',
-        reasons: [
-          'Moderate temperature and rainfall support soybean growth',
-          'Good phosphorus levels enhance pod development',
-          'Soil pH (6.0-7.0) is suitable for soybean',
-          'Balanced nutrients promote healthy crop yield'
-        ],
-        suitability: 85,
-      },
-    ];
+      setLoadingMessage('Getting your location...');
+      let position;
+      try {
+        position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+          timeout: 15000,
+        });
+      } catch (locationError) {
+        position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeout: 15000,
+        });
+      }
 
-    const mockFieldInfo = {
-      nitrogen: 245,
-      phosphorous: 142,
-      potassium: 218,
-      temperature: 28,
-      humidity: 72,
-      ph: 6.5,
-      rain: 680,
-    };
+      const { latitude, longitude } = position.coords;
+      
+      if (!latitude || !longitude) {
+        setError('Unable to get your location. Please try again.');
+        setLoading(false);
+        return;
+      }
 
-    setTopCrops(mockCrops);
-    setFieldInfo(mockFieldInfo);
-    setLoading(false);
+      // Step 2: Fetching data
+      setLoadingMessage('Fetching data...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 3: Analysing
+      setLoadingMessage('Analysing soil conditions...');
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Step 4: Inferencing model
+      setLoadingMessage('Inferencing model...');
+      
+      // Make API call
+      const apiUrl = `https://kisanone-backend-render-deployment.onrender.com/api/v1/crop-recommendations/recommend?lat=${latitude}&lon=${longitude}`;
+      
+      const response = await axios.post(apiUrl, {}, {
+        headers: {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Step 5: Processing results
+      setLoadingMessage('Processing results...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+
+      const data = response.data;
+
+      // Map API response to our format
+      if (data.imputed_values) {
+        setFieldInfo({
+          nitrogen: data.imputed_values.N || 0,
+          phosphorous: data.imputed_values.P || 0,
+          potassium: data.imputed_values.K || 0,
+          temperature: data.imputed_values.temperature || 0,
+          humidity: data.imputed_values.humidity || 0,
+          ph: data.imputed_values.ph || 0,
+          rain: data.imputed_values.rainfall || 0,
+        });
+      }
+
+      // Map recommendations
+      if (data.recommendations && Array.isArray(data.recommendations)) {
+        const crops = data.recommendations.map((rec, index) => {
+          const [name, probability, reason] = rec;
+          return {
+            id: index + 1,
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            icon: '🌾',
+            reasons: reason ? [reason] : [],
+            suitability: Math.round(probability * 100),
+          };
+        });
+        setTopCrops(crops);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error('Error loading recommendations:', err);
+      setError(err.response?.data?.message || err.message || 'Failed to load crop recommendations. Please try again.');
+      setLoading(false);
+    }
   };
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   const getQualityColor = (value, type) => {
     if (type === 'ph') {
@@ -133,12 +244,53 @@ export default function CropRecommendationScreen({ navigation }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('cropRecommendationTitle')}</Text>
+          <Text style={styles.headerTitle}>Crop Recommendation</Text>
           <View style={{ width: 44 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#22A06B" />
-          <Text style={styles.loadingText}>{t('analyzingYourField')}</Text>
+          <Animated.View
+            style={[
+              styles.loadingIconContainer,
+              {
+                transform: [
+                  { scale: pulseAnim },
+                  { rotate: spin },
+                ],
+              },
+            ]}
+          >
+            <Ionicons name="leaf" size={64} color="#22A06B" />
+          </Animated.View>
+          <Animated.View style={{ opacity: fadeAnim, marginTop: 24 }}>
+            <Text style={styles.loadingText}>{loadingMessage}</Text>
+          </Animated.View>
+          <View style={styles.loadingDots}>
+            <Animated.View style={[styles.dot, { opacity: fadeAnim }]} />
+            <Animated.View style={[styles.dot, { opacity: fadeAnim }]} />
+            <Animated.View style={[styles.dot, { opacity: fadeAnim }]} />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Crop Recommendation</Text>
+          <View style={{ width: 44 }} />
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={64} color="#EF4444" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadRecommendations}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -327,11 +479,52 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
+  },
+  loadingIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#22A06B',
+    textAlign: 'center',
+  },
+  loadingDots: {
+    flexDirection: 'row',
     marginTop: 16,
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22A06B',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  errorText: {
     fontSize: 16,
     color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#22A06B',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,
